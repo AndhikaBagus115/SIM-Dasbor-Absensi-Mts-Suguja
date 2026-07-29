@@ -84,8 +84,8 @@ lib/
 
 ### 1. Clone Repositori
 ```bash
-git clone https://github.com/AndhikaBagus115/mts-school-admin-dashboard.git
-cd mts-school-admin-dashboard
+git clone https://github.com/AndhikaBagus115/SIM-Dasbor-Absensi-Mts-Suguja.git
+cd SIM-Dasbor-Absensi-Mts-Suguja
 ```
 
 ### 2. Konfigurasi Environment (`.env`)
