@@ -185,58 +185,65 @@ class _SidebarState extends State<Sidebar> {
   }
 
   Widget _buildAdminProfile() {
-    // Animasi tinggi profil
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      height: _isCollapsed ? 0 : 80,
-      curve: Curves.easeInOut,
-      clipBehavior: Clip.hardEdge,
-      child: OverflowBox(
-        minWidth: _sidebarWidthExpanded,
-        maxWidth: _sidebarWidthExpanded,
-        alignment: Alignment.topLeft,
-        child: Container(
-          width: _sidebarWidthExpanded, // Paksa lebar penuh agar tidak gepeng
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                Image.asset(
-                  'assets/Logo MTS.png',
-                  width: 30,
-                  height: 30,
-                  // Fallback jika gambar error/belum load
-                  errorBuilder: (ctx, err, stack) =>
-                      const Icon(Icons.account_circle, size: 30),
+    // Animasi tinggi profil dengan ClipRect agar terpotong rapi saat collapse
+    return ClipRect(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        height: _isCollapsed ? 0 : 80,
+        curve: Curves.easeInOut,
+        child: OverflowBox(
+          minWidth: _sidebarWidthExpanded,
+          maxWidth: _sidebarWidthExpanded,
+          minHeight: 80,
+          maxHeight: 80,
+          alignment: Alignment.topLeft,
+          child: SizedBox(
+            width: _sidebarWidthExpanded,
+            height: 80,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        'Administrator',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
-                        ),
-                        overflow: TextOverflow.ellipsis,
+                child: Row(
+                  children: [
+                    Image.asset(
+                      'assets/Logo MTS.png',
+                      width: 30,
+                      height: 30,
+                      // Fallback jika gambar error/belum load
+                      errorBuilder: (ctx, err, stack) =>
+                          const Icon(Icons.account_circle, size: 30),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            'Administrator',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            'Online',
+                            style: TextStyle(color: Colors.green, fontSize: 11),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
                       ),
-                      Text(
-                        'Online',
-                        style: TextStyle(color: Colors.green, fontSize: 11),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         ),
