@@ -4,11 +4,11 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 class AppConstants {
   static const String schoolName = 'MTs Sunan Gunung Jati';
   
-  // These can be set via initializeForWeb() on web platform
+  // Optional web overrides
   static String? _webSupabaseUrl;
   static String? _webSupabaseAnonKey;
   
-  /// Initialize web-specific constants (call this on web before accessing Supabase constants)
+  /// Initialize web-specific constants (optional override)
   static void initializeForWeb({
     required String supabaseUrl,
     required String supabaseAnonKey,
@@ -17,40 +17,75 @@ class AppConstants {
     _webSupabaseAnonKey = supabaseAnonKey;
   }
   
-  /// Get Supabase URL from environment variables
+  /// Get Supabase URL from environment variables or compile-time flags
   static String get supabaseUrl {
-    // Check web override first
+    // 1. Compile-time flag
+    const fromEnv = String.fromEnvironment('SUPABASE_URL');
+    if (fromEnv.isNotEmpty) return fromEnv;
+
+    // 2. Web runtime override
     if (_webSupabaseUrl != null && _webSupabaseUrl!.isNotEmpty) {
       return _webSupabaseUrl!;
     }
     
+    // 3. Dotenv file
     final url = dotenv.env['SUPABASE_URL'];
-    if (url == null || url.isEmpty) {
-      throw Exception(
-        'SUPABASE_URL is not configured. Please check your .env file.',
-      );
+    if (url != null && url.isNotEmpty) {
+      return url;
     }
-    return url;
+
+    throw Exception(
+      'SUPABASE_URL is not configured. Please set SUPABASE_URL in your .env file or build with --dart-define=SUPABASE_URL=...',
+    );
   }
 
-  /// Get Supabase Anonymous Key from environment variables
+  /// Get Supabase Anonymous Key from environment variables or compile-time flags
   static String get supabaseAnonKey {
-    // Check web override first
+    // 1. Compile-time flag
+    const fromEnv = String.fromEnvironment('SUPABASE_ANON_KEY');
+    if (fromEnv.isNotEmpty) return fromEnv;
+
+    // 2. Web runtime override
     if (_webSupabaseAnonKey != null && _webSupabaseAnonKey!.isNotEmpty) {
       return _webSupabaseAnonKey!;
     }
     
+    // 3. Dotenv file
     final key = dotenv.env['SUPABASE_ANON_KEY'];
-    if (key == null || key.isEmpty) {
-      throw Exception(
-        'SUPABASE_ANON_KEY is not configured. Please check your .env file.',
-      );
+    if (key != null && key.isNotEmpty) {
+      return key;
     }
-    return key;
+
+    throw Exception(
+      'SUPABASE_ANON_KEY is not configured. Please set SUPABASE_ANON_KEY in your .env file or build with --dart-define=SUPABASE_ANON_KEY=...',
+    );
+  }
+
+  /// Get WAHA Base URL from environment variables or compile-time flags
+  static String get wahaBaseUrl {
+    const fromEnv = String.fromEnvironment('WAHA_BASE_URL');
+    if (fromEnv.isNotEmpty) return fromEnv;
+    return dotenv.env['WAHA_BASE_URL'] ?? 'http://108.136.150.199:3000';
+  }
+
+  /// Get WAHA API Key from environment variables or compile-time flags
+  static String get wahaApiKey {
+    const fromEnv = String.fromEnvironment('WAHA_API_KEY');
+    if (fromEnv.isNotEmpty) return fromEnv;
+    return dotenv.env['WAHA_API_KEY'] ?? '';
+  }
+
+  /// Get WAHA Session Name
+  static String get wahaSession {
+    const fromEnv = String.fromEnvironment('WAHA_SESSION');
+    if (fromEnv.isNotEmpty) return fromEnv;
+    return dotenv.env['WAHA_SESSION'] ?? 'default';
   }
 
   /// Get application environment (development, staging, production)
   static String get appEnvironment {
+    const fromEnv = String.fromEnvironment('APP_ENVIRONMENT');
+    if (fromEnv.isNotEmpty) return fromEnv;
     return dotenv.env['APP_ENVIRONMENT'] ?? 'development';
   }
 

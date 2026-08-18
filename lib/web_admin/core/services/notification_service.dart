@@ -1,7 +1,8 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:web_admin_mts/web_admin/core/services/logging_service.dart';
+import '../constants.dart';
+import 'logging_service.dart';
 
 /// Type of notification to send
 enum NotificationType {
@@ -16,18 +17,17 @@ enum NotificationType {
 
 /// WAHA (WhatsApp HTTP API) Configuration
 class WahaConfig {
-  /// Base URL for WAHA API
-  static const String baseUrl = 'http://108.136.150.199:3000';
+  /// Base URL for WAHA API (retrieved dynamically from environment)
+  static String get baseUrl => AppConstants.wahaBaseUrl;
   
   /// Session name for WAHA
-  static const String session = 'default';
+  static String get session => AppConstants.wahaSession;
   
   /// Endpoint for sending text messages
   static const String sendTextEndpoint = '/api/sendText';
   
-  /// API Key for WAHA authentication
-  /// Get this from your WAHA dashboard or configuration
-  static const String apiKey = 'f83da457356e4227905f5da4ebb8084b'; // TODO: Masukkan API Key WAHA Anda di sini
+  /// API Key for WAHA authentication (retrieved dynamically from environment)
+  static String get apiKey => AppConstants.wahaApiKey;
 }
 
 /// Model for parent notification
