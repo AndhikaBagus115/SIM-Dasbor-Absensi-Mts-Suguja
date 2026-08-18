@@ -190,8 +190,11 @@ class _SidebarState extends State<Sidebar> {
       duration: const Duration(milliseconds: 200),
       height: _isCollapsed ? 0 : 80,
       curve: Curves.easeInOut,
-      child: SingleChildScrollView(
-        physics: const NeverScrollableScrollPhysics(),
+      clipBehavior: Clip.hardEdge,
+      child: OverflowBox(
+        minWidth: _sidebarWidthExpanded,
+        maxWidth: _sidebarWidthExpanded,
+        alignment: Alignment.topLeft,
         child: Container(
           width: _sidebarWidthExpanded, // Paksa lebar penuh agar tidak gepeng
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
