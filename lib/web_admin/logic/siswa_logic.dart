@@ -8,12 +8,21 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:universal_html/html.dart' as html; // Khusus Web Download
-
-// --- IMPORT CONSTANTS (Opsional, tapi disarankan) ---
-// import '../core/constants.dart';
+import '../data/repositories/siswa_repository.dart';
+import '../data/repositories/kelas_repository.dart';
 
 class DataSiswaLogic with ChangeNotifier {
-  final SupabaseClient supabase = Supabase.instance.client;
+  final SupabaseClient supabase;
+  final SiswaRepository siswaRepository;
+  final KelasRepository kelasRepository;
+
+  DataSiswaLogic({
+    SupabaseClient? client,
+    SiswaRepository? siswaRepo,
+    KelasRepository? kelasRepo,
+  })  : supabase = client ?? Supabase.instance.client,
+        siswaRepository = siswaRepo ?? SiswaRepositoryImpl(client ?? Supabase.instance.client),
+        kelasRepository = kelasRepo ?? KelasRepositoryImpl(client ?? Supabase.instance.client);
 
   // --- State ---
   bool _isLoading = true;

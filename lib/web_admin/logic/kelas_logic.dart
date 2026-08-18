@@ -1,9 +1,20 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../data/repositories/kelas_repository.dart';
+import '../data/repositories/guru_repository.dart';
 
 class PageKelasLogic extends ChangeNotifier {
-  // Instance Supabase disimpan sebagai properti agar tidak dipanggil berulang kali
-  final _supabase = Supabase.instance.client;
+  final SupabaseClient _supabase;
+  final KelasRepository kelasRepository;
+  final GuruRepository guruRepository;
+
+  PageKelasLogic({
+    SupabaseClient? client,
+    KelasRepository? kelasRepo,
+    GuruRepository? guruRepo,
+  })  : _supabase = client ?? Supabase.instance.client,
+        kelasRepository = kelasRepo ?? KelasRepositoryImpl(client ?? Supabase.instance.client),
+        guruRepository = guruRepo ?? GuruRepositoryImpl(client ?? Supabase.instance.client);
 
   // 1. State
   bool _isLoading = true;

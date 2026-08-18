@@ -4,9 +4,13 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../data/repositories/absensi_repository.dart';
+import '../data/repositories/kelas_repository.dart';
 
 class AbsensiController extends ChangeNotifier {
-  final SupabaseClient supabase = Supabase.instance.client;
+  final SupabaseClient supabase;
+  final AbsensiRepository absensiRepository;
+  final KelasRepository kelasRepository;
   final String schoolName;
 
   // --- STATE UTAMA ---
@@ -32,7 +36,14 @@ class AbsensiController extends ChangeNotifier {
   // Data Kelas (Untuk Dropdown)
   List<Map<String, dynamic>> daftarKelas = [];
 
-  AbsensiController({required this.schoolName}) {
+  AbsensiController({
+    required this.schoolName,
+    SupabaseClient? client,
+    AbsensiRepository? absensiRepo,
+    KelasRepository? kelasRepo,
+  })  : supabase = client ?? Supabase.instance.client,
+        absensiRepository = absensiRepo ?? AbsensiRepositoryImpl(client ?? Supabase.instance.client),
+        kelasRepository = kelasRepo ?? KelasRepositoryImpl(client ?? Supabase.instance.client) {
     fetchKelas();
     fetchData();
   }

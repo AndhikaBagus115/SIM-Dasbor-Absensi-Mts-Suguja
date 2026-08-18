@@ -4,9 +4,16 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:window_manager/window_manager.dart';
+
 import 'web_admin/core/constants.dart';
+import 'web_admin/data/repositories/absensi_repository.dart';
+import 'web_admin/data/repositories/guru_repository.dart';
+import 'web_admin/data/repositories/kelas_repository.dart';
+import 'web_admin/data/repositories/siswa_repository.dart';
+import 'web_admin/data/repositories/surat_repository.dart';
 
 import 'web_admin/login.dart';
 import 'web_admin/dashboard.dart';
@@ -24,25 +31,17 @@ final supabase = Supabase.instance.client;
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 0. Load environment variables (skip on web since .env isn't served as asset)
-  if (!kIsWeb) {
-    try {
-      await dotenv.load(fileName: '.env');
-    } catch (e) {
-      print('Warning: Could not load .env file: $e');
-    }
-  } else {
-    // On web, initialize with hardcoded values or use a config service
-    AppConstants.initializeForWeb(
-      supabaseUrl: 'https://eachbhkjgadrpmrpbwat.supabase.co',
-      supabaseAnonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVhY2hiaGtqZ2FkcnBtcnBid2F0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk2Njk1MDEsImV4cCI6MjA3NTI0NTUwMX0.gZPdf88neU4yuLdKkUlTKNadpsRArxUp2IlQHk-XCrI',
-    );
+  // 0. Load environment variables (.env file if available, otherwise compile-time flags)
+  try {
+    await dotenv.load(fileName: '.env');
+  } catch (e) {
+    debugPrint('Note: .env file not loaded directly ($e). Relying on compile-time environment flags.');
   }
 
-  // 1. Initialize Supabase 
+  // 1. Initialize Supabase
   await Supabase.initialize(
-    url: AppConstants.supabaseUrl, 
-    anonKey: AppConstants.supabaseAnonKey, 
+    url: AppConstants.supabaseUrl,
+    anonKey: AppConstants.supabaseAnonKey,
   );
 
   // 2. Setup Desktop
@@ -83,23 +82,42 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      // Menggunakan variabel nama sekolah
-      title: 'Admin ${AppConstants.schoolName}',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        fontFamily: 'Poppins',
-        useMaterial3: true,
-        visualDensity: VisualDensity.adaptivePlatformDensity,
-      ),
-      localizationsDelegates: const [
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
+    return MultiProvider(
+      providers: [
+        Provider<SiswaRepository>(
+          create: (_) => SiswaRepositoryImpl(supabase),
+        ),
+        Provider<GuruRepository>(
+          create: (_) => GuruRepositoryImpl(supabase),
+        ),
+        Provider<KelasRepository>(
+          create: (_) => KelasRepositoryImpl(supabase),
+        ),
+        Provider<AbsensiRepository>(
+          create: (_) => AbsensiRepositoryImpl(supabase),
+        ),
+        Provider<SuratRepository>(
+          create: (_) => SuratRepositoryImpl(supabase),
+        ),
       ],
-      supportedLocales: const [Locale('id', 'ID'), Locale('en', 'US')],
-      home: const AuthGate(),
+      child: MaterialApp(
+        // Menggunakan variabel nama sekolah
+        title: 'Admin ${AppConstants.schoolName}',
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(
+          primarySwatch: Colors.blue,
+          fontFamily: 'Poppins',
+          useMaterial3: true,
+          visualDensity: VisualDensity.adaptivePlatformDensity,
+        ),
+        localizationsDelegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: const [Locale('id', 'ID'), Locale('en', 'US')],
+        home: const AuthGate(),
+      ),
     );
   }
 }
