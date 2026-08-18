@@ -34,6 +34,7 @@ abstract class KelasRepository {
 /// Implementation of KelasRepository using Supabase
 class KelasRepositoryImpl implements KelasRepository {
   final SupabaseClient _supabase;
+  List<Kelas>? _cachedKelas;
 
   KelasRepositoryImpl(this._supabase);
 
@@ -42,28 +43,34 @@ class KelasRepositoryImpl implements KelasRepository {
     String? searchQuery,
     int limit = 20,
     int offset = 0,
+    bool forceRefresh = false,
   }) async {
     try {
-      dynamic response;
-
-      if (searchQuery != null && searchQuery.isNotEmpty) {
-        response = await _supabase
-            .from(DbTables.kelas)
-            .select()
-            .order(KelasColumns.namaKelas)
-            .ilike(KelasColumns.namaKelas, '%$searchQuery%') // ignore: undefined_method
-            .range(offset, offset + limit - 1);
-      } else {
-        response = await _supabase
-            .from(DbTables.kelas)
-            .select()
-            .order(KelasColumns.namaKelas)
-            .range(offset, offset + limit - 1);
+      if (!forceRefresh && (searchQuery == null || searchQuery.isEmpty) && offset == 0 && _cachedKelas != null) {
+        return _cachedKelas!;
       }
 
-      return (response as List<dynamic>)
+      dynamic response;
+
+      var query = _supabase.from(DbTables.kelas).select();
+
+      if (searchQuery != null && searchQuery.isNotEmpty) {
+        query = query.ilike(KelasColumns.namaKelas, '%$searchQuery%');
+      }
+
+      response = await query
+          .order(KelasColumns.namaKelas)
+          .range(offset, offset + limit - 1);
+
+      final result = (response as List<dynamic>)
           .map((json) => Kelas.fromJson(json as Map<String, dynamic>))
           .toList();
+
+      if ((searchQuery == null || searchQuery.isEmpty) && offset == 0) {
+        _cachedKelas = result;
+      }
+
+      return result;
     } on PostgrestException catch (e) {
       throw RepositoryException(
         message: 'Failed to fetch classes: ${e.message}',
@@ -119,6 +126,7 @@ class KelasRepositoryImpl implements KelasRepository {
           .select()
           .single();
 
+      _cachedKelas = null;
       return Kelas.fromJson(response);
     } on PostgrestException catch (e) {
       throw RepositoryException(
@@ -147,6 +155,7 @@ class KelasRepositoryImpl implements KelasRepository {
           .select()
           .single();
 
+      _cachedKelas = null;
       return Kelas.fromJson(response);
     } on PostgrestException catch (e) {
       throw RepositoryException(
@@ -170,6 +179,7 @@ class KelasRepositoryImpl implements KelasRepository {
           .from(DbTables.kelas)
           .delete()
           .eq(KelasColumns.id, id);
+      _cachedKelas = null;
     } on PostgrestException catch (e) {
       throw RepositoryException(
         message: 'Failed to delete class: ${e.message}',

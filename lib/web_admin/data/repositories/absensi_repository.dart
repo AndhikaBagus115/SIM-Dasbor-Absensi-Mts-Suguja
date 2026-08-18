@@ -55,62 +55,24 @@ class AbsensiRepositoryImpl implements AbsensiRepository {
     try {
       dynamic response;
 
-      if (siswaId != null && siswaId.isNotEmpty && startDate != null && endDate != null && status != null && status.isNotEmpty) {
-        // ignore: undefined_method
-        response = await _supabase
-            .from(DbTables.absensi)
-            .select()
-            .order(AbsensiColumns.tanggal, ascending: false)
-            .eq(AbsensiColumns.siswaId, int.parse(siswaId)) // ignore: undefined_method
-            .gte(AbsensiColumns.tanggal, startDate.toIso8601String())
-            .lte(AbsensiColumns.tanggal, endDate.toIso8601String())
-            .eq(AbsensiColumns.status, status) // ignore: undefined_method
-            .range(offset, offset + limit - 1);
-      } else if (siswaId != null && siswaId.isNotEmpty && startDate != null && endDate != null && status != null && status.isNotEmpty) {
-        // ignore: undefined_method
-        response = await _supabase
-            .from(DbTables.absensi)
-            .select()
-            .order(AbsensiColumns.tanggal, ascending: false)
-            .eq(AbsensiColumns.siswaId, int.parse(siswaId)) // ignore: undefined_method
-            .gte(AbsensiColumns.tanggal, startDate.toIso8601String())
-            .lte(AbsensiColumns.tanggal, endDate.toIso8601String())
-            .eq(AbsensiColumns.status, status) // ignore: undefined_method
-            .range(offset, offset + limit - 1);
-      } else if (siswaId != null && siswaId.isNotEmpty && startDate != null && endDate != null) {
-        // ignore: undefined_method
-        response = await _supabase
-            .from(DbTables.absensi)
-            .select()
-            .order(AbsensiColumns.tanggal, ascending: false)
-            .eq(AbsensiColumns.siswaId, int.parse(siswaId)) // ignore: undefined_method
-            .gte(AbsensiColumns.tanggal, startDate.toIso8601String())
-            .lte(AbsensiColumns.tanggal, endDate.toIso8601String())
-            .range(offset, offset + limit - 1);
-      } else if (siswaId != null && siswaId.isNotEmpty && startDate != null) {
-        // ignore: undefined_method
-        response = await _supabase
-            .from(DbTables.absensi)
-            .select()
-            .order(AbsensiColumns.tanggal, ascending: false)
-            .eq(AbsensiColumns.siswaId, int.parse(siswaId)) // ignore: undefined_method
-            .gte(AbsensiColumns.tanggal, startDate.toIso8601String())
-            .range(offset, offset + limit - 1);
-      } else if (siswaId != null && siswaId.isNotEmpty) {
-        // ignore: undefined_method
-        response = await _supabase
-            .from(DbTables.absensi)
-            .select()
-            .order(AbsensiColumns.tanggal, ascending: false)
-            .eq(AbsensiColumns.siswaId, int.parse(siswaId)) // ignore: undefined_method
-            .range(offset, offset + limit - 1);
-      } else {
-        response = await _supabase
-            .from(DbTables.absensi)
-            .select()
-            .order(AbsensiColumns.tanggal, ascending: false)
-            .range(offset, offset + limit - 1);
+      var query = _supabase.from(DbTables.absensi).select();
+
+      if (siswaId != null && siswaId.isNotEmpty) {
+        query = query.eq(AbsensiColumns.siswaId, int.parse(siswaId));
       }
+      if (startDate != null) {
+        query = query.gte(AbsensiColumns.tanggal, startDate.toIso8601String());
+      }
+      if (endDate != null) {
+        query = query.lte(AbsensiColumns.tanggal, endDate.toIso8601String());
+      }
+      if (status != null && status.isNotEmpty) {
+        query = query.eq(AbsensiColumns.status, status);
+      }
+
+      response = await query
+          .order(AbsensiColumns.tanggal, ascending: false)
+          .range(offset, offset + limit - 1);
 
 
       return (response as List<dynamic>)

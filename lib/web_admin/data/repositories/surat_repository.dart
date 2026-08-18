@@ -52,65 +52,24 @@ class SuratRepositoryImpl implements SuratRepository {
     try {
       dynamic response;
 
-      if (siswaId != null && siswaId.isNotEmpty && tipe != null && tipe.isNotEmpty && startDate != null && endDate != null) {
-        response = await _supabase
-            .from(DbTables.surat)
-            .select()
-            .order(SuratColumns.tanggal, ascending: false)
-            .eq(SuratColumns.siswaId, int.parse(siswaId)) // ignore: undefined_method
-            .eq(SuratColumns.tipe, tipe) // ignore: undefined_method
-            .gte(SuratColumns.tanggal, startDate.toIso8601String())
-            .lte(SuratColumns.tanggal, endDate.toIso8601String())
-            .range(offset, offset + limit - 1);
-      } else if (siswaId != null && siswaId.isNotEmpty && tipe != null && tipe.isNotEmpty && startDate != null) {
-        response = await _supabase
-            .from(DbTables.surat)
-            .select()
-            .order(SuratColumns.tanggal, ascending: false)
-            .eq(SuratColumns.siswaId, int.parse(siswaId)) // ignore: undefined_method
-            .eq(SuratColumns.tipe, tipe) // ignore: undefined_method
-            .gte(SuratColumns.tanggal, startDate.toIso8601String())
-            .range(offset, offset + limit - 1);
-      } else if (siswaId != null && siswaId.isNotEmpty && tipe != null && tipe.isNotEmpty) {
-        response = await _supabase
-            .from(DbTables.surat)
-            .select()
-            .order(SuratColumns.tanggal, ascending: false)
-            .eq(SuratColumns.siswaId, int.parse(siswaId)) // ignore: undefined_method
-            .eq(SuratColumns.tipe, tipe) // ignore: undefined_method
-            .range(offset, offset + limit - 1);
-      } else if (siswaId != null && siswaId.isNotEmpty && startDate != null && endDate != null) {
-        response = await _supabase
-            .from(DbTables.surat)
-            .select()
-            .order(SuratColumns.tanggal, ascending: false)
-            .eq(SuratColumns.siswaId, int.parse(siswaId)) // ignore: undefined_method
-            .gte(SuratColumns.tanggal, startDate.toIso8601String())
-            .lte(SuratColumns.tanggal, endDate.toIso8601String())
-            .range(offset, offset + limit - 1);
-      } else if (siswaId != null && siswaId.isNotEmpty) {
-        response = await _supabase
-            .from(DbTables.surat)
-            .select()
-            .order(SuratColumns.tanggal, ascending: false)
-            .eq(SuratColumns.siswaId, int.parse(siswaId)) // ignore: undefined_method
-            .range(offset, offset + limit - 1);
-      } else if (tipe != null && tipe.isNotEmpty && startDate != null && endDate != null) {
-        response = await _supabase
-            .from(DbTables.surat)
-            .select()
-            .order(SuratColumns.tanggal, ascending: false)
-            .eq(SuratColumns.tipe, tipe) // ignore: undefined_method
-            .gte(SuratColumns.tanggal, startDate.toIso8601String())
-            .lte(SuratColumns.tanggal, endDate.toIso8601String())
-            .range(offset, offset + limit - 1);
-      } else {
-        response = await _supabase
-            .from(DbTables.surat)
-            .select()
-            .order(SuratColumns.tanggal, ascending: false)
-            .range(offset, offset + limit - 1);
+      var query = _supabase.from(DbTables.surat).select();
+
+      if (siswaId != null && siswaId.isNotEmpty) {
+        query = query.eq(SuratColumns.siswaId, int.parse(siswaId));
       }
+      if (tipe != null && tipe.isNotEmpty) {
+        query = query.eq(SuratColumns.tipe, tipe);
+      }
+      if (startDate != null) {
+        query = query.gte(SuratColumns.tanggal, startDate.toIso8601String());
+      }
+      if (endDate != null) {
+        query = query.lte(SuratColumns.tanggal, endDate.toIso8601String());
+      }
+
+      response = await query
+          .order(SuratColumns.tanggal, ascending: false)
+          .range(offset, offset + limit - 1);
 
       return (response as List<dynamic>)
           .map((json) => Surat.fromJson(json as Map<String, dynamic>))

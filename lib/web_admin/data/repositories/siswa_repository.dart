@@ -214,7 +214,6 @@ class SiswaRepositoryImpl implements SiswaRepository {
       }
 
       final response = await query.count(CountOption.exact);
-      
       return response.count;
     } catch (e) {
       return 0;
