@@ -101,8 +101,7 @@ class MyApp extends StatelessWidget {
         ),
       ],
       child: MaterialApp(
-        // Menggunakan variabel nama sekolah
-        title: 'Admin ${AppConstants.schoolName}',
+        title: 'Admin MTs Suguja',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
           primarySwatch: Colors.blue,
