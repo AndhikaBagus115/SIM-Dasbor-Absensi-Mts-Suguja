@@ -8,6 +8,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:universal_html/html.dart' as html; // Khusus Web Download
+import '../core/services/master_data_cache_service.dart';
 import '../data/repositories/siswa_repository.dart';
 import '../data/repositories/kelas_repository.dart';
 
@@ -89,15 +90,13 @@ class DataSiswaLogic with ChangeNotifier {
 
   // --- FETCHING ---
 
-  Future<void> _fetchKelas() async {
+  Future<void> _fetchKelas({bool forceRefresh = false}) async {
     _isKelasLoading = true;
     notifyListeners();
 
     try {
-      final response = await supabase
-          .from('kelas')
-          .select('id, nama_kelas')
-          .order('nama_kelas', ascending: true);
+      final response = await MasterDataCacheService.instance
+          .getKelasList(forceRefresh: forceRefresh);
       _kelasList = List<Map<String, dynamic>>.from(response);
     } catch (e) {
       debugPrint('Error fetching kelas: $e');
@@ -297,6 +296,7 @@ class DataSiswaLogic with ChangeNotifier {
         await supabase.from('siswa').insert(data);
       }
 
+      MasterDataCacheService.instance.invalidateSiswa(kelasId: kelasId);
       await fetchSiswa(""); // Refresh tanpa reset filter
       return null;
     } catch (e) {
@@ -307,6 +307,7 @@ class DataSiswaLogic with ChangeNotifier {
   Future<String?> deleteSiswa(int id) async {
     try {
       await supabase.from('siswa').delete().eq('id', id);
+      MasterDataCacheService.instance.invalidateSiswa();
       await fetchSiswa("");
       return null;
     } catch (e) {
@@ -392,6 +393,7 @@ class DataSiswaLogic with ChangeNotifier {
 
       // Bulk Insert
       await supabase.from('siswa').upsert(batchData, onConflict: 'nis');
+      MasterDataCacheService.instance.invalidateSiswa(kelasId: targetKelasId);
 
       // Tutup Loading
       if (context.mounted) {
@@ -410,28 +412,81 @@ class DataSiswaLogic with ChangeNotifier {
   // --- PDF & QR CODE ---
 
   Future<void> generateBarcodePdf(BuildContext context) async {
-    if (_siswaData.isEmpty) {
-      _showSnackbar(
-        context,
-        'Tidak ada data siswa di halaman ini.',
-        isError: true,
+    // 1. Tampilkan loading dialog agar user mengetahui proses persiapan PDF semua siswa
+    if (context.mounted) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const Center(
+          child: Card(
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(width: 16),
+                  Text('Menyiapkan semua QR Code siswa...'),
+                ],
+              ),
+            ),
+          ),
+        ),
       );
-      return;
     }
 
     try {
+      // 2. Fetch seluruh data siswa sesuai filter aktif (tanpa batasan pagination)
+      var query = supabase
+          .from('siswa')
+          .select('id, nis, nama, status, kelas_id, kelas!inner(nama_kelas)');
+
+      if (_selectedKelasId != null) {
+        query = query.eq('kelas_id', _selectedKelasId!);
+      }
+
+      if (_selectedStatus != null) {
+        query = query.eq('status', _selectedStatus!);
+      }
+
+      if (_lastSearchQuery.isNotEmpty) {
+        query = query.ilike('nama', '%$_lastSearchQuery%');
+      }
+
+      final response = await query.order('nama', ascending: true);
+      final List<Map<String, dynamic>> allSiswa =
+          List<Map<String, dynamic>>.from(response);
+
+      // Tutup loading dialog
+      if (context.mounted && Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+
+      if (allSiswa.isEmpty) {
+        if (context.mounted) {
+          _showSnackbar(
+            context,
+            'Tidak ada data siswa yang sesuai filter untuk dicetak.',
+            isError: true,
+          );
+        }
+        return;
+      }
+
+      // 3. Bangun dokumen PDF dengan seluruh QR code siswa
       final pdf = pw.Document();
 
-      // Buat Grid Item QR Code
-      final List<pw.Widget> grids = _siswaData.map((s) {
+      final List<pw.Widget> grids = allSiswa.map((s) {
         final nis = s['nis']?.toString() ?? '-';
         final nama = s['nama']?.toString() ?? 'Siswa';
+        final kelasNama =
+            s['kelas']?['nama_kelas']?.toString() ?? selectedKelasNama;
 
         return pw.Container(
           padding: const pw.EdgeInsets.all(8),
           decoration: pw.BoxDecoration(
             border: pw.Border.all(color: PdfColors.grey300),
-            borderRadius: pw.BorderRadius.circular(4),
+            borderRadius: pw.BorderRadius.circular(6),
           ),
           child: pw.Column(
             mainAxisAlignment: pw.MainAxisAlignment.center,
@@ -439,13 +494,23 @@ class DataSiswaLogic with ChangeNotifier {
               pw.Text(
                 nama,
                 style: pw.TextStyle(
-                  fontSize: 10,
+                  fontSize: 9.5,
                   fontWeight: pw.FontWeight.bold,
                 ),
                 textAlign: pw.TextAlign.center,
                 maxLines: 1,
               ),
-              pw.SizedBox(height: 4),
+              pw.SizedBox(height: 2),
+              pw.Text(
+                kelasNama,
+                style: const pw.TextStyle(
+                  fontSize: 7.5,
+                  color: PdfColors.grey700,
+                ),
+                textAlign: pw.TextAlign.center,
+                maxLines: 1,
+              ),
+              pw.SizedBox(height: 6),
               pw.BarcodeWidget(
                 barcode: pw.Barcode.qrCode(),
                 data: nis,
@@ -454,7 +519,13 @@ class DataSiswaLogic with ChangeNotifier {
                 drawText: false,
               ),
               pw.SizedBox(height: 4),
-              pw.Text(nis, style: const pw.TextStyle(fontSize: 8)),
+              pw.Text(
+                'NIS: $nis',
+                style: const pw.TextStyle(
+                  fontSize: 8,
+                  color: PdfColors.grey800,
+                ),
+              ),
             ],
           ),
         );
@@ -464,12 +535,31 @@ class DataSiswaLogic with ChangeNotifier {
         pw.MultiPage(
           pageFormat: PdfPageFormat.a4,
           margin: const pw.EdgeInsets.all(20),
+          header: (ctx) => pw.Container(
+            alignment: pw.Alignment.centerRight,
+            margin: const pw.EdgeInsets.only(bottom: 12),
+            child: pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text(
+                  'Kartu QR Code Presensi - $selectedKelasNama (${allSiswa.length} Siswa)',
+                  style: pw.TextStyle(
+                    fontSize: 12,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+                pw.Text(
+                  'Halaman ${ctx.pageNumber} dari ${ctx.pagesCount}',
+                  style:
+                      const pw.TextStyle(fontSize: 9, color: PdfColors.grey600),
+                ),
+              ],
+            ),
+          ),
           build: (context) => [
-            pw.Header(level: 0, child: pw.Text("QR Code - $selectedKelasNama")),
-            pw.SizedBox(height: 10),
             pw.GridView(
               crossAxisCount: 3,
-              childAspectRatio: 0.8,
+              childAspectRatio: 0.78,
               crossAxisSpacing: 10,
               mainAxisSpacing: 10,
               children: grids,
@@ -478,7 +568,7 @@ class DataSiswaLogic with ChangeNotifier {
         ),
       );
 
-      // Trigger Print/Download di Browser
+      // Trigger Print / Download di Browser
       await Printing.layoutPdf(
         onLayout: (format) async => pdf.save(),
         name:
@@ -486,6 +576,7 @@ class DataSiswaLogic with ChangeNotifier {
       );
     } catch (e) {
       if (context.mounted) {
+        if (Navigator.canPop(context)) Navigator.pop(context);
         _showSnackbar(context, 'Gagal generate PDF: $e', isError: true);
       }
     }
