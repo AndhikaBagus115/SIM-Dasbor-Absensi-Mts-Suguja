@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../core/services/master_data_cache_service.dart';
 import '../data/repositories/kelas_repository.dart';
 import '../data/repositories/guru_repository.dart';
 
@@ -28,17 +29,13 @@ class PageKelasLogic extends ChangeNotifier {
 
   // 3. Metode Logika
 
-  /// Mengambil data kelas dan guru secara PARALLEL (Lebih Cepat)
-  Future<void> fetchData() async {
+  /// Mengambil data kelas dan guru secara PARALLEL (Lebih Cepat & Ber-Cache)
+  Future<void> fetchData({bool forceRefresh = false}) async {
     _setLoading(true);
     try {
-      // OPTIMASI: Gunakan Future.wait agar request berjalan bersamaan
       final results = await Future.wait([
-        // [0] Fetch Guru
-        _supabase
-            .from('guru')
-            .select('id, nama')
-            .order('nama', ascending: true),
+        // [0] Fetch Guru via MasterDataCacheService
+        MasterDataCacheService.instance.getGuruList(forceRefresh: forceRefresh),
 
         // [1] Fetch Kelas (Join Guru)
         _supabase
@@ -48,12 +45,10 @@ class PageKelasLogic extends ChangeNotifier {
       ]);
 
       // Parsing hasil
-      _guruData = List<Map<String, dynamic>>.from(results[0] as List);
+      _guruData = List<Map<String, dynamic>>.from(results[0]);
 
       final rawKelas = results[1] as List;
       _kelasData = rawKelas.map((data) => _formatKelasData(data)).toList();
-
-      // debugPrint('Data loaded: ${_kelasData.length} Kelas, ${_guruData.length} Guru');
     } catch (e) {
       debugPrint('Error fetching data: $e');
     } finally {
@@ -92,6 +87,7 @@ class PageKelasLogic extends ChangeNotifier {
       if (index != -1) {
         _kelasData[index] = updatedKelas;
         _sortKelasData(); // Sort ulang biar rapi
+        MasterDataCacheService.instance.invalidateKelas();
         notifyListeners();
       }
 
@@ -128,6 +124,7 @@ class PageKelasLogic extends ChangeNotifier {
       final newKelas = _formatKelasData(response.first);
       _kelasData.add(newKelas);
       _sortKelasData();
+      MasterDataCacheService.instance.invalidateKelas();
 
       notifyListeners();
       return null; // Sukses

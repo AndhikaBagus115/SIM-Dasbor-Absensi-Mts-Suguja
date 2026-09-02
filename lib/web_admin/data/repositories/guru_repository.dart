@@ -1,7 +1,8 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:web_admin_mts/web_admin/core/constants.dart';
-import 'package:web_admin_mts/web_admin/core/exceptions.dart';
-import 'package:web_admin_mts/web_admin/data/models/guru_model.dart';
+import '../../core/constants.dart';
+import '../../core/exceptions.dart';
+import '../../core/services/master_data_cache_service.dart';
+import '../models/guru_model.dart';
 
 /// Abstract repository interface for Guru operations
 abstract class GuruRepository {
@@ -127,6 +128,7 @@ class GuruRepositoryImpl implements GuruRepository {
           .single();
 
       _cachedGuru = null;
+      MasterDataCacheService.instance.invalidateGuru();
       return Guru.fromJson(response);
     } on PostgrestException catch (e) {
       throw RepositoryException(
@@ -156,6 +158,7 @@ class GuruRepositoryImpl implements GuruRepository {
           .single();
 
       _cachedGuru = null;
+      MasterDataCacheService.instance.invalidateGuru();
       return Guru.fromJson(response);
     } on PostgrestException catch (e) {
       throw RepositoryException(
@@ -180,6 +183,7 @@ class GuruRepositoryImpl implements GuruRepository {
           .delete()
           .filter(GuruColumns.id, 'eq', id);
       _cachedGuru = null;
+      MasterDataCacheService.instance.invalidateGuru();
     } on PostgrestException catch (e) {
       throw RepositoryException(
         message: 'Failed to delete teacher: ${e.message}',

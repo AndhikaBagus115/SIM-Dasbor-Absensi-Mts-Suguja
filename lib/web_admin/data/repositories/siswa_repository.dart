@@ -1,7 +1,8 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:web_admin_mts/web_admin/core/constants.dart';
-import 'package:web_admin_mts/web_admin/core/exceptions.dart';
-import 'package:web_admin_mts/web_admin/data/models/siswa_model.dart';
+import '../../core/constants.dart';
+import '../../core/exceptions.dart';
+import '../../core/services/master_data_cache_service.dart';
+import '../models/siswa_model.dart';
 
 /// Abstract repository interface for Siswa operations
 abstract class SiswaRepository {
@@ -138,6 +139,7 @@ class SiswaRepositoryImpl implements SiswaRepository {
           .select()
           .single();
 
+      MasterDataCacheService.instance.invalidateSiswa(kelasId: int.tryParse(data[SiswaColumns.kelasId]?.toString() ?? ''));
       return Siswa.fromJson(response);
     } on PostgrestException catch (e) {
       throw RepositoryException(
@@ -166,6 +168,7 @@ class SiswaRepositoryImpl implements SiswaRepository {
           .select()
           .single();
 
+      MasterDataCacheService.instance.invalidateSiswa(kelasId: int.tryParse(data[SiswaColumns.kelasId]?.toString() ?? ''));
       return Siswa.fromJson(response);
     } on PostgrestException catch (e) {
       throw RepositoryException(
@@ -189,6 +192,7 @@ class SiswaRepositoryImpl implements SiswaRepository {
           .from(DbTables.siswa)
           .delete()
           .filter(SiswaColumns.id, 'eq', id);
+      MasterDataCacheService.instance.invalidateSiswa();
     } on PostgrestException catch (e) {
       throw RepositoryException(
         message: 'Failed to delete student: ${e.message}',

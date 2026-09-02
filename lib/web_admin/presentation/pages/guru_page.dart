@@ -4,6 +4,7 @@ import 'package:multi_select_flutter/multi_select_flutter.dart';
 import 'dart:typed_data';
 import 'package:image_picker/image_picker.dart';
 import '../../core/constants.dart';
+import '../../core/services/master_data_cache_service.dart';
 
 // --- MODEL KELAS OPTION (Untuk MultiSelect) ---
 class KelasOption {
@@ -48,13 +49,11 @@ class _PageGuruState extends State<PageGuru> {
     fetchGuru();
   }
 
-  Future<void> fetchGuru() async {
+  Future<void> fetchGuru({bool forceRefresh = false}) async {
     if (mounted) setState(() => isLoading = true);
     try {
-      final response = await supabase
-          .from('guru')
-          .select()
-          .order('nama', ascending: true);
+      final response = await MasterDataCacheService.instance
+          .getGuruList(forceRefresh: forceRefresh);
       if (mounted) {
         setState(() {
           guruData = List<Map<String, dynamic>>.from(response);
@@ -156,11 +155,12 @@ class _PageGuruState extends State<PageGuru> {
                     );
                   }
 
+                  MasterDataCacheService.instance.invalidateGuru();
                   if (dialogContext.mounted) {
                     Navigator.of(dialogContext).pop();
                   }
 
-                  fetchGuru();
+                  fetchGuru(forceRefresh: true);
                 } catch (e) {
                   if (e.toString().contains("User already registered")) {
                     throw "Email sudah terdaftar sebagai pengguna lain.";
@@ -192,6 +192,7 @@ class _PageGuruState extends State<PageGuru> {
               try {
                 final id = guru['id'];
                 await supabase.from('guru').delete().eq('id', id);
+                MasterDataCacheService.instance.invalidateGuru();
 
                 final avatarUrl = guru['avatar_url'] as String?;
                 if (avatarUrl != null && avatarUrl.isNotEmpty) {
@@ -208,7 +209,7 @@ class _PageGuruState extends State<PageGuru> {
                 _showSuccessSnackbar(
                   'Data guru ${guru['nama']} berhasil dihapus',
                 );
-                fetchGuru();
+                fetchGuru(forceRefresh: true);
               } catch (e) {
                 if (dialogContext.mounted) Navigator.of(dialogContext).pop();
                 _showErrorSnackbar("Gagal menghapus data: $e");

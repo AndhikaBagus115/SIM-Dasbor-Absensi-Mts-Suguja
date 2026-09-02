@@ -1,7 +1,8 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:web_admin_mts/web_admin/core/constants.dart';
-import 'package:web_admin_mts/web_admin/core/exceptions.dart';
-import 'package:web_admin_mts/web_admin/data/models/kelas_model.dart';
+import '../../core/constants.dart';
+import '../../core/exceptions.dart';
+import '../../core/services/master_data_cache_service.dart';
+import '../models/kelas_model.dart';
 
 /// Abstract repository interface for Kelas operations
 abstract class KelasRepository {
@@ -127,6 +128,7 @@ class KelasRepositoryImpl implements KelasRepository {
           .single();
 
       _cachedKelas = null;
+      MasterDataCacheService.instance.invalidateKelas();
       return Kelas.fromJson(response);
     } on PostgrestException catch (e) {
       throw RepositoryException(
@@ -156,6 +158,7 @@ class KelasRepositoryImpl implements KelasRepository {
           .single();
 
       _cachedKelas = null;
+      MasterDataCacheService.instance.invalidateKelas();
       return Kelas.fromJson(response);
     } on PostgrestException catch (e) {
       throw RepositoryException(
@@ -180,6 +183,7 @@ class KelasRepositoryImpl implements KelasRepository {
           .delete()
           .eq(KelasColumns.id, id);
       _cachedKelas = null;
+      MasterDataCacheService.instance.invalidateKelas();
     } on PostgrestException catch (e) {
       throw RepositoryException(
         message: 'Failed to delete class: ${e.message}',

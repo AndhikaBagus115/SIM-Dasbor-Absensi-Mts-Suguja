@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/constants.dart';
+import '../../core/services/master_data_cache_service.dart';
 import '../../core/services/notification_service.dart';
 import '../../core/services/onesignal_service.dart';
 import '../../data/models/pengumuman_model.dart';
@@ -137,13 +138,11 @@ class _NotifikasiTestPageState extends State<NotifikasiTestPage>
   // DATA FETCHING METHODS
   // ============================================================
 
-  Future<void> _fetchKelas() async {
+  Future<void> _fetchKelas({bool forceRefresh = false}) async {
     setState(() => _isLoadingKelas = true);
     try {
-      final response = await _supabase
-          .from('kelas')
-          .select('id, nama_kelas')
-          .order('nama_kelas');
+      final response = await MasterDataCacheService.instance
+          .getKelasList(forceRefresh: forceRefresh);
 
       setState(() {
         _daftarKelas = List<Map<String, dynamic>>.from(response);
@@ -175,14 +174,11 @@ class _NotifikasiTestPageState extends State<NotifikasiTestPage>
     }
   }
 
-  Future<void> _fetchSiswaByKelas(int kelasId) async {
+  Future<void> _fetchSiswaByKelas(int kelasId, {bool forceRefresh = false}) async {
     setState(() => _isLoadingKelasSiswa = true);
     try {
-      final response = await _supabase
-          .from('siswa')
-          .select('id, nis, nama, orang_tua_nomor')
-          .eq('kelas_id', kelasId)
-          .eq('status', 'aktif');
+      final response = await MasterDataCacheService.instance
+          .getActiveSiswaByKelas(kelasId, forceRefresh: forceRefresh);
 
       setState(() {
         _kelasSiswaList = List<Map<String, dynamic>>.from(response);

@@ -4,6 +4,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../core/services/master_data_cache_service.dart';
 import '../data/repositories/absensi_repository.dart';
 import '../data/repositories/kelas_repository.dart';
 
@@ -68,14 +69,12 @@ class AbsensiController extends ChangeNotifier {
 
   // --- FETCHING LOGIC ---
 
-  Future<void> fetchKelas() async {
+  Future<void> fetchKelas({bool forceRefresh = false}) async {
     isKelasLoading = true;
     notifyListeners();
     try {
-      final response = await supabase
-          .from('kelas')
-          .select('id, nama_kelas')
-          .order('nama_kelas');
+      final response = await MasterDataCacheService.instance
+          .getKelasList(forceRefresh: forceRefresh);
       daftarKelas = List<Map<String, dynamic>>.from(response);
     } catch (e) {
       debugPrint("Error Fetch Kelas: $e");
