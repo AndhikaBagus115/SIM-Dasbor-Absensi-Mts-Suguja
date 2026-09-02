@@ -129,37 +129,43 @@ class _DashboardScreenState extends State<DashboardScreen> {
         DateTime(currentYear, isJanToJun ? 6 : 12, isJanToJun ? 30 : 31),
       );
 
-      // 1) Total siswa aktif (optimasi count query)
-      final countRes = await supabase
-          .from('siswa')
-          .select('id')
-          .eq('status', 'aktif')
-          .count(CountOption.exact);
-      final totalSiswaAktif = countRes.count;
+      // Eksekusi semua query secara paralel menggunakan Future.wait
+      final results = await Future.wait<dynamic>([
+        // 1) Total siswa aktif (count query)
+        supabase
+            .from('siswa')
+            .select('id')
+            .eq('status', 'aktif')
+            .count(CountOption.exact),
+        // 2) Absensi hari ini (minimal kolom)
+        supabase
+            .from('absensi')
+            .select('status, created_at, waktu_masuk, siswa_id')
+            .eq('tanggal', tglHariIni),
+        // 3) Aktivitas terbaru (join siswa)
+        supabase
+            .from('absensi')
+            .select('status, created_at, waktu_masuk, siswa(nama)')
+            .order('created_at', ascending: false)
+            .limit(6),
+        // 4) Distribusi kelas
+        supabase.from('kelas').select('id, nama_kelas, siswa(count)'),
+        // 5) Rekapan semester
+        supabase
+            .from('absensi')
+            .select('status, tanggal')
+            .gte('tanggal', tglMulaiSemester)
+            .lte('tanggal', tglAkhirSemester),
+      ]);
 
-      // 2) Absensi hari ini (ambil minimal kolom yang dibutuhkan)
-      final absensiHariIni = await supabase
-          .from('absensi')
-          .select('status, created_at, waktu_masuk, siswa_id')
-          .eq('tanggal', tglHariIni);
-
-      // 3) Aktivitas terbaru (join siswa)
-      final aktivitasRes = await supabase
-          .from('absensi')
-          .select('status, created_at, waktu_masuk, siswa(nama)')
-          .order('created_at', ascending: false)
-          .limit(6);
-
-      // 4) Distribusi kelas (kelas dengan count siswa)
-      final distribusiRes =
-          await supabase.from('kelas').select('id, nama_kelas, siswa(count)');
-
-      // 5) Rekapan semester (status + tanggal)
-      final rekapanSemesterRes = await supabase
-          .from('absensi')
-          .select('status, tanggal')
-          .gte('tanggal', tglMulaiSemester)
-          .lte('tanggal', tglAkhirSemester);
+      final countRes = results[0] as dynamic;
+      final totalSiswaAktif = (countRes is PostgrestResponse)
+          ? countRes.count
+          : (countRes.count as int? ?? 0);
+      final absensiHariIni = results[1] as List<dynamic>;
+      final aktivitasRes = results[2] as List<dynamic>;
+      final distribusiRes = results[3] as List<dynamic>;
+      final rekapanSemesterRes = results[4] as List<dynamic>;
 
       // =========================
       // PROCESS: HARI INI
@@ -171,7 +177,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       int inputLuarJam = 0;
       int totalTerlambatHariIni = 0;
 
-      for (final row in (absensiHariIni as List)) {
+      for (final row in absensiHariIni) {
         final status = _normStatus(row['status']);
 
         if (_isHadirLike(status)) {
@@ -198,7 +204,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final List<Map<String, dynamic>> distribusiData = [];
       int colorIndex = 0;
 
-      for (final item in (distribusiRes as List)) {
+      for (final item in distribusiRes) {
         final siswaCountList = item['siswa'];
         final int count = (siswaCountList is List && siswaCountList.isNotEmpty)
             ? (siswaCountList[0]['count'] as int? ?? 0)
@@ -222,7 +228,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       int absenSem = 0;
       final Set<String> hariUnik = {};
 
-      for (final row in (rekapanSemesterRes as List)) {
+      for (final row in rekapanSemesterRes) {
         final status = _normStatus(row['status']);
         final tgl = row['tanggal']?.toString();
         if (tgl != null) hariUnik.add(tgl);
@@ -250,7 +256,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         });
       }
 
-      if (now.weekday == DateTime.sunday && (absensiHariIni as List).isNotEmpty) {
+      if (now.weekday == DateTime.sunday && absensiHariIni.isNotEmpty) {
         anomalyAlerts.add({
           'icon': Icons.event_busy,
           'color': const Color(0xFFFFA726),
@@ -291,7 +297,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _terlambatHariIni = terlambat;
         _absenHariIni = absen;
 
-        _aktivitasTerbaru = List<Map<String, dynamic>>.from(aktivitasRes as List);
+        _aktivitasTerbaru = List<Map<String, dynamic>>.from(aktivitasRes);
         _distribusiKelas = distribusiData;
 
         _hadirSemester = hadirSem;

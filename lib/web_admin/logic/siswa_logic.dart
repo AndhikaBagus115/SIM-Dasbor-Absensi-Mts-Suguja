@@ -394,13 +394,16 @@ class DataSiswaLogic with ChangeNotifier {
       await supabase.from('siswa').upsert(batchData, onConflict: 'nis');
 
       // Tutup Loading
-      if (context.mounted) Navigator.pop(context);
-
-      _showSnackbar(context, 'Berhasil import ${batchData.length} data!');
+      if (context.mounted) {
+        Navigator.pop(context);
+        _showSnackbar(context, 'Berhasil import ${batchData.length} data!');
+      }
       await fetchSiswa("");
     } catch (e) {
-      if (context.mounted && Navigator.canPop(context)) Navigator.pop(context);
-      _showSnackbar(context, 'Gagal import: $e', isError: true);
+      if (context.mounted) {
+        if (Navigator.canPop(context)) Navigator.pop(context);
+        _showSnackbar(context, 'Gagal import: $e', isError: true);
+      }
     }
   }
 
@@ -482,7 +485,9 @@ class DataSiswaLogic with ChangeNotifier {
             'QR_${selectedKelasNama}_${DateTime.now().millisecondsSinceEpoch}.pdf',
       );
     } catch (e) {
-      _showSnackbar(context, 'Gagal generate PDF: $e', isError: true);
+      if (context.mounted) {
+        _showSnackbar(context, 'Gagal generate PDF: $e', isError: true);
+      }
     }
   }
 
@@ -500,6 +505,7 @@ class DataSiswaLogic with ChangeNotifier {
     String message, {
     bool isError = false,
   }) {
+    if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),

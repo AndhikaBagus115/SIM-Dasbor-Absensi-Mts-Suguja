@@ -34,6 +34,17 @@ class _DataSiswaPageState extends State<DataSiswaPage> {
     searchController.addListener(_onSearchChanged);
   }
 
+  @override
+  void didUpdateWidget(covariant DataSiswaPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialKelasId != oldWidget.initialKelasId) {
+      _logic.onKelasSelected(
+        widget.initialKelasId != null ? int.tryParse(widget.initialKelasId!) : null,
+        searchController.text,
+      );
+    }
+  }
+
   void _onLogicUpdate() {
     if (mounted) {
       setState(() {});
@@ -108,7 +119,7 @@ class _DataSiswaPageState extends State<DataSiswaPage> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) {
+      builder: (dialogCtx) {
         return AlertDialog(
           title: Text(isEdit ? "Edit Siswa" : "Tambah Siswa"),
           content: SingleChildScrollView(
@@ -190,7 +201,7 @@ class _DataSiswaPageState extends State<DataSiswaPage> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.pop(dialogCtx),
               child: const Text("Batal"),
             ),
             ElevatedButton(
@@ -210,23 +221,23 @@ class _DataSiswaPageState extends State<DataSiswaPage> {
                   status: status,
                 );
 
-                if (!mounted) return;
-
-                if (error == null) {
-                  Navigator.pop(context);
+                if (dialogCtx.mounted && error == null) {
+                  Navigator.pop(dialogCtx);
                 }
 
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      error ??
-                          (isEdit
-                              ? 'Data berhasil diperbarui'
-                              : 'Data siswa berhasil ditambahkan'),
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        error ??
+                            (isEdit
+                                ? 'Data berhasil diperbarui'
+                                : 'Data siswa berhasil ditambahkan'),
+                      ),
+                      backgroundColor: error == null ? Colors.green : Colors.red,
                     ),
-                    backgroundColor: error == null ? Colors.green : Colors.red,
-                  ),
-                );
+                  );
+                }
               },
               child: Text(isEdit ? "Simpan" : "Tambah"),
             ),
@@ -336,9 +347,9 @@ class _DataSiswaPageState extends State<DataSiswaPage> {
 
     showDialog(
       context: context,
-      builder: (context) {
+      builder: (dialogCtx) {
         return StatefulBuilder(
-          builder: (context, setStateDialog) {
+          builder: (sbCtx, setStateDialog) {
             return AlertDialog(
               title: const Text("Proses Kenaikan Kelas Massal"),
               content: SizedBox(
@@ -410,7 +421,7 @@ class _DataSiswaPageState extends State<DataSiswaPage> {
               ),
               actions: [
                 TextButton(
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () => Navigator.pop(dialogCtx),
                   child: const Text("Batal"),
                 ),
                 ElevatedButton(
@@ -420,15 +431,19 @@ class _DataSiswaPageState extends State<DataSiswaPage> {
                   ),
                   onPressed: () async {
                     if (sourceKelasId == null) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text("Pilih kelas asal!")),
-                      );
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text("Pilih kelas asal!")),
+                        );
+                      }
                       return;
                     }
                     if (!isLuluskan && targetKelasId == null) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text("Pilih kelas tujuan!")),
-                      );
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text("Pilih kelas tujuan!")),
+                        );
+                      }
                       return;
                     }
 
@@ -438,8 +453,10 @@ class _DataSiswaPageState extends State<DataSiswaPage> {
                       isLuluskan: isLuluskan,
                     );
 
+                    if (dialogCtx.mounted) {
+                      Navigator.pop(dialogCtx);
+                    }
                     if (mounted) {
-                      Navigator.pop(context);
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                           content: Text("Proses berhasil!"),
@@ -853,7 +870,8 @@ class _DataSiswaPageState extends State<DataSiswaPage> {
                     child: DataTable(
                       columnSpacing: 24,
                       headingRowHeight: 56,
-                      dataRowHeight: 64,
+                      dataRowMinHeight: 64,
+                      dataRowMaxHeight: 64,
                       headingRowColor: WidgetStateProperty.all(
                         Colors.blue.shade50,
                       ),

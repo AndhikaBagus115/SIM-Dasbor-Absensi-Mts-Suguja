@@ -350,7 +350,8 @@ class _PageGuruState extends State<PageGuru> {
                 child: DataTable(
                   columnSpacing: 24,
                   headingRowHeight: 56,
-                  dataRowHeight: 80,
+                  dataRowMinHeight: 80,
+                  dataRowMaxHeight: 80,
                   headingRowColor: WidgetStateProperty.all(
                     Colors.blue.shade50,
                   ),

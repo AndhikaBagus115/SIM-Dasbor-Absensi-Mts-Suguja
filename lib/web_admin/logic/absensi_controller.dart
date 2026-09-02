@@ -257,12 +257,14 @@ class AbsensiController extends ChangeNotifier {
         await _generatePdfHarian(context);
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Gagal export PDF: $e"),
-          backgroundColor: Colors.red,
-        ),
-      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Gagal export PDF: $e"),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 

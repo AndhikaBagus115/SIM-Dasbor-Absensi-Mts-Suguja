@@ -245,7 +245,8 @@ class _KelasDataTable extends StatelessWidget {
                 child: DataTable(
                   columnSpacing: 12,
                   headingRowHeight: 50,
-                  dataRowHeight: 60,
+                  dataRowMinHeight: 60,
+                  dataRowMaxHeight: 60,
                   headingRowColor: WidgetStateProperty.all(
                     Colors.blue.shade50,
                   ),

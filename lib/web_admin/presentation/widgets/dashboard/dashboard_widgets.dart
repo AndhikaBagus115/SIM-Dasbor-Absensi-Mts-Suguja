@@ -482,7 +482,7 @@ class ChartsSectionResponsive extends StatelessWidget {
     if (isMobile) {
       return Column(
         children: [
-          const StatistikKehadiranChart(),
+          const StatistikKehadiranChart(isMobile: true),
           const SizedBox(height: 12),
           PieChartCard(distribusiData: distribusiKelas),
         ],
@@ -492,7 +492,7 @@ class ChartsSectionResponsive extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Expanded(flex: 2, child: StatistikKehadiranChart()),
+        const Expanded(flex: 2, child: StatistikKehadiranChart(isMobile: false)),
         const SizedBox(width: 12),
         Expanded(child: PieChartCard(distribusiData: distribusiKelas)),
       ],
@@ -501,7 +501,8 @@ class ChartsSectionResponsive extends StatelessWidget {
 }
 
 class StatistikKehadiranChart extends StatefulWidget {
-  const StatistikKehadiranChart({super.key});
+  final bool isMobile;
+  const StatistikKehadiranChart({super.key, this.isMobile = false});
 
   @override
   State<StatistikKehadiranChart> createState() => _StatistikKehadiranChartState();
@@ -631,6 +632,90 @@ class _StatistikKehadiranChartState extends State<StatistikKehadiranChart> {
 
   String _getLeftTitle(double v) => v.toInt().toString();
 
+  Widget _buildChartContent() {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    return LineChart(
+      LineChartData(
+        gridData: FlGridData(
+          show: true,
+          drawVerticalLine: false,
+          horizontalInterval: _maxY > 0 ? _maxY / 5 : 5,
+          getDrawingHorizontalLine: (v) => FlLine(color: Colors.grey.shade200, strokeWidth: 1),
+        ),
+        titlesData: FlTitlesData(
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              interval: _intervalX,
+              getTitlesWidget: (value, meta) {
+                final title = _bottomTitles[value.toDouble()];
+                if (title == null) return const SizedBox.shrink();
+                return Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(title, style: const TextStyle(color: Colors.grey, fontSize: 10)),
+                );
+              },
+            ),
+          ),
+          leftTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              interval: _maxY > 0 ? _maxY / 5 : 5,
+              reservedSize: 36,
+              getTitlesWidget: (v, _) => Text(
+                _getLeftTitle(v),
+                style: const TextStyle(color: Colors.grey, fontSize: 11),
+              ),
+            ),
+          ),
+          rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+        ),
+        borderData: FlBorderData(show: false),
+        minX: _minX,
+        maxX: _maxX,
+        minY: 0,
+        maxY: _maxY,
+        lineBarsData: [
+          LineChartBarData(
+            spots: _spots,
+            isCurved: true,
+            color: const Color(0xFF42A5F5),
+            barWidth: 3,
+            dotData: FlDotData(
+              show: true,
+              getDotPainter: (_, __, ___, ____) => FlDotCirclePainter(
+                radius: 4,
+                color: Colors.white,
+                strokeWidth: 2,
+                strokeColor: const Color(0xFF42A5F5),
+              ),
+            ),
+            belowBarData: BarAreaData(
+              show: true,
+              color: const Color(0xFF42A5F5).withValues(alpha: 0.10),
+            ),
+          ),
+        ],
+        lineTouchData: LineTouchData(
+          touchTooltipData: LineTouchTooltipData(
+            getTooltipColor: (_) => Colors.blueAccent,
+            getTooltipItems: (spots) => spots
+                .map(
+                  (s) => LineTooltipItem(
+                    '${s.y.toInt()} siswa',
+                    const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  ),
+                )
+                .toList(),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return WhiteCard(
@@ -653,87 +738,8 @@ class _StatistikKehadiranChartState extends State<StatistikKehadiranChart> {
           ),
           const SizedBox(height: 14),
           SizedBox(
-            height: 260,
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : LineChart(
-                    LineChartData(
-                      gridData: FlGridData(
-                        show: true,
-                        drawVerticalLine: false,
-                        horizontalInterval: _maxY > 0 ? _maxY / 5 : 5,
-                        getDrawingHorizontalLine: (v) => FlLine(color: Colors.grey.shade200, strokeWidth: 1),
-                      ),
-                      titlesData: FlTitlesData(
-                        bottomTitles: AxisTitles(
-                          sideTitles: SideTitles(
-                            showTitles: true,
-                            interval: _intervalX,
-                            getTitlesWidget: (value, meta) {
-                              final title = _bottomTitles[value.toDouble()];
-                              if (title == null) return const SizedBox.shrink();
-                              return Padding(
-                                padding: const EdgeInsets.only(top: 8),
-                                child: Text(title, style: const TextStyle(color: Colors.grey, fontSize: 10)),
-                              );
-                            },
-                          ),
-                        ),
-                        leftTitles: AxisTitles(
-                          sideTitles: SideTitles(
-                            showTitles: true,
-                            interval: _maxY > 0 ? _maxY / 5 : 5,
-                            reservedSize: 36,
-                            getTitlesWidget: (v, _) => Text(
-                              _getLeftTitle(v),
-                              style: const TextStyle(color: Colors.grey, fontSize: 11),
-                            ),
-                          ),
-                        ),
-                        rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                        topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                      ),
-                      borderData: FlBorderData(show: false),
-                      minX: _minX,
-                      maxX: _maxX,
-                      minY: 0,
-                      maxY: _maxY,
-                      lineBarsData: [
-                        LineChartBarData(
-                          spots: _spots,
-                          isCurved: true,
-                          color: const Color(0xFF42A5F5),
-                          barWidth: 3,
-                          dotData: FlDotData(
-                            show: true,
-                            getDotPainter: (_, __, ___, ____) => FlDotCirclePainter(
-                              radius: 4,
-                              color: Colors.white,
-                              strokeWidth: 2,
-                              strokeColor: const Color(0xFF42A5F5),
-                            ),
-                          ),
-                          belowBarData: BarAreaData(
-                            show: true,
-                            color: const Color(0xFF42A5F5).withValues(alpha: 0.10),
-                          ),
-                        ),
-                      ],
-                      lineTouchData: LineTouchData(
-                        touchTooltipData: LineTouchTooltipData(
-                          getTooltipColor: (_) => Colors.blueAccent,
-                          getTooltipItems: (spots) => spots
-                              .map(
-                                (s) => LineTooltipItem(
-                                  '${s.y.toInt()} siswa',
-                                  const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                                ),
-                              )
-                              .toList(),
-                        ),
-                      ),
-                    ),
-                  ),
+            height: widget.isMobile ? 260 : 390,
+            child: _buildChartContent(),
           ),
         ],
       ),
