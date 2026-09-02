@@ -26,36 +26,49 @@ class Sidebar extends StatefulWidget {
 class _SidebarState extends State<Sidebar> {
   bool _isCollapsed = false;
 
+  // Status buka/tutup dropdown untuk masing-masing kategori
+  bool _expandDataMaster = true;
+  bool _expandPresensi = true;
+  bool _expandPengaturan = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _autoExpand();
+  }
+
+  @override
+  void didUpdateWidget(covariant Sidebar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.selectedIndex != widget.selectedIndex) {
+      _autoExpand();
+    }
+  }
+
+  void _autoExpand() {
+    final idx = widget.selectedIndex;
+    if (idx == 2 || idx == 3 || idx == 4) {
+      _expandDataMaster = true;
+    } else if (idx == 1 || idx == 5) {
+      _expandPresensi = true;
+    } else if (idx == 6 || idx == 7) {
+      _expandPengaturan = true;
+    }
+  }
+
   void _toggleSidebar() {
     setState(() => _isCollapsed = !_isCollapsed);
   }
 
   @override
   Widget build(BuildContext context) {
-    // Definisi Menu
-    final List<Map<String, dynamic>> menuItems = [
-      {'icon': Icons.dashboard_outlined, 'title': 'Dashboard', 'index': 0},
-      {
-        'icon': Icons.assignment_turned_in_outlined,
-        'title': 'Absensi',
-        'index': 1,
-      },
-      {'icon': Icons.person_outline, 'title': 'Data Guru', 'index': 2},
-      {'icon': Icons.class_outlined, 'title': 'Data Kelas', 'index': 3},
-      {'icon': Icons.school_outlined, 'title': 'Data Siswa', 'index': 4},
-      {'icon': Icons.mail_outline, 'title': 'Surat', 'index': 5},
-      {'icon': Icons.notifications_active_outlined, 'title': 'Test Notifikasi', 'index': 6},
-    ];
-
     return AnimatedContainer(
       width: _isCollapsed ? _sidebarWidthCollapsed : _sidebarWidthExpanded,
-      duration: const Duration(milliseconds: 300),
+      duration: const Duration(milliseconds: 250),
       curve: Curves.fastOutSlowIn,
-      // Clip layout agar tidak ada yang bocor keluar
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: Colors.white,
-        // Border kanan 1px ini yang memakan tempat layout sebelumnya
         border: Border(
           right: BorderSide(color: Colors.grey.shade200, width: 1),
         ),
@@ -78,32 +91,147 @@ class _SidebarState extends State<Sidebar> {
             // Profile Admin
             _buildAdminProfile(),
 
-            const SizedBox(height: 10),
+            const SizedBox(height: 6),
 
             // Menu List
             Expanded(
               child: ListView(
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                // Cegah scroll horizontal di listview
+                padding: const EdgeInsets.symmetric(vertical: 6),
                 physics: const ClampingScrollPhysics(),
                 children: [
-                  ...menuItems.map(
-                    (item) => _buildMenuItem(
-                      icon: item['icon'] as IconData,
-                      title: item['title'] as String,
-                      index: item['index'] as int,
-                    ),
+                  // 1. MENU UTAMA
+                  if (!_isCollapsed) _buildStaticHeader('MENU UTAMA'),
+                  _buildMenuItem(
+                    icon: Icons.dashboard_outlined,
+                    title: 'Dashboard',
+                    index: 0,
                   ),
 
+                  const SizedBox(height: 4),
+
+                  // 2. DATA MASTER (DROPDOWN PADA JUDUL)
+                  if (!_isCollapsed) ...[
+                    _buildDropdownHeader(
+                      title: 'DATA MASTER',
+                      isExpanded: _expandDataMaster,
+                      containsActive: [2, 3, 4].contains(widget.selectedIndex),
+                      onToggle: () => setState(() => _expandDataMaster = !_expandDataMaster),
+                    ),
+                    if (_expandDataMaster) ...[
+                      _buildMenuItem(
+                        icon: Icons.person_outline,
+                        title: 'Data Guru',
+                        index: 2,
+                      ),
+                      _buildMenuItem(
+                        icon: Icons.class_outlined,
+                        title: 'Data Kelas',
+                        index: 3,
+                      ),
+                      _buildMenuItem(
+                        icon: Icons.school_outlined,
+                        title: 'Data Siswa',
+                        index: 4,
+                      ),
+                    ],
+                  ] else ...[
+                    _buildMenuItem(
+                      icon: Icons.person_outline,
+                      title: 'Data Guru',
+                      index: 2,
+                    ),
+                    _buildMenuItem(
+                      icon: Icons.class_outlined,
+                      title: 'Data Kelas',
+                      index: 3,
+                    ),
+                    _buildMenuItem(
+                      icon: Icons.school_outlined,
+                      title: 'Data Siswa',
+                      index: 4,
+                    ),
+                  ],
+
+                  const SizedBox(height: 4),
+
+                  // 3. PRESENSI & LAYANAN (DROPDOWN PADA JUDUL)
+                  if (!_isCollapsed) ...[
+                    _buildDropdownHeader(
+                      title: 'PRESENSI & LAYANAN',
+                      isExpanded: _expandPresensi,
+                      containsActive: [1, 5].contains(widget.selectedIndex),
+                      onToggle: () => setState(() => _expandPresensi = !_expandPresensi),
+                    ),
+                    if (_expandPresensi) ...[
+                      _buildMenuItem(
+                        icon: Icons.assignment_turned_in_outlined,
+                        title: 'Absensi',
+                        index: 1,
+                      ),
+                      _buildMenuItem(
+                        icon: Icons.mail_outline,
+                        title: 'Surat',
+                        index: 5,
+                      ),
+                    ],
+                  ] else ...[
+                    _buildMenuItem(
+                      icon: Icons.assignment_turned_in_outlined,
+                      title: 'Absensi',
+                      index: 1,
+                    ),
+                    _buildMenuItem(
+                      icon: Icons.mail_outline,
+                      title: 'Surat',
+                      index: 5,
+                    ),
+                  ],
+
+                  const SizedBox(height: 4),
+
+                  // 4. PENGATURAN (DROPDOWN PADA JUDUL)
+                  if (!_isCollapsed) ...[
+                    _buildDropdownHeader(
+                      title: 'PENGATURAN',
+                      isExpanded: _expandPengaturan,
+                      containsActive: [6, 7].contains(widget.selectedIndex),
+                      onToggle: () => setState(() => _expandPengaturan = !_expandPengaturan),
+                    ),
+                    if (_expandPengaturan) ...[
+                      _buildMenuItem(
+                        icon: Icons.notifications_active_outlined,
+                        title: 'Notifikasi',
+                        index: 6,
+                      ),
+                      _buildMenuItem(
+                        icon: Icons.manage_accounts_outlined,
+                        title: 'Profil Admin',
+                        index: 7,
+                      ),
+                    ],
+                  ] else ...[
+                    _buildMenuItem(
+                      icon: Icons.notifications_active_outlined,
+                      title: 'Notifikasi',
+                      index: 6,
+                    ),
+                    _buildMenuItem(
+                      icon: Icons.manage_accounts_outlined,
+                      title: 'Profil Admin',
+                      index: 7,
+                    ),
+                  ],
+
                   const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 10, horizontal: 20),
+                    padding: EdgeInsets.symmetric(vertical: 8, horizontal: 20),
                     child: Divider(),
                   ),
 
+                  // 5. KELUAR
                   _buildMenuItem(
                     icon: Icons.logout_rounded,
                     title: 'Keluar',
-                    index: 7,
+                    index: 8,
                     isLogout: true,
                   ),
                 ],
@@ -115,8 +243,64 @@ class _SidebarState extends State<Sidebar> {
     );
   }
 
+  Widget _buildStaticHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 18, right: 16, top: 10, bottom: 4),
+      child: Text(
+        title,
+        style: TextStyle(
+          fontSize: 10.5,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.8,
+          color: Colors.grey.shade500,
+          fontFamily: 'Segoe UI',
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDropdownHeader({
+    required String title,
+    required bool isExpanded,
+    required bool containsActive,
+    required VoidCallback onToggle,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onToggle,
+        hoverColor: Colors.grey.shade100,
+        child: Padding(
+          padding: const EdgeInsets.only(left: 18, right: 16, top: 12, bottom: 4),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.8,
+                    color: containsActive ? AppColors.primary : Colors.grey.shade500,
+                    fontFamily: 'Segoe UI',
+                  ),
+                ),
+              ),
+              Icon(
+                isExpanded
+                    ? Icons.keyboard_arrow_down_rounded
+                    : Icons.keyboard_arrow_right_rounded,
+                size: 16,
+                color: containsActive ? AppColors.primary : Colors.grey.shade400,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildHeader() {
-    // Gunakan LayoutBuilder agar responsif terhadap lebar parent
     return SizedBox(
       height: 70,
       child: SingleChildScrollView(
@@ -125,7 +309,6 @@ class _SidebarState extends State<Sidebar> {
         child: SizedBox(
           width: _isCollapsed ? _sidebarWidthCollapsed : _sidebarWidthExpanded,
           child: Row(
-            // Center jika collapsed agar icon pas ditengah
             mainAxisAlignment: _isCollapsed
                 ? MainAxisAlignment.center
                 : MainAxisAlignment.start,
@@ -172,6 +355,7 @@ class _SidebarState extends State<Sidebar> {
                           icon: const Icon(Icons.chevron_left_rounded),
                           color: AppColors.primary,
                           onPressed: _toggleSidebar,
+                          tooltip: 'Tutup Menu',
                         ),
                       ],
                     ),
@@ -185,7 +369,6 @@ class _SidebarState extends State<Sidebar> {
   }
 
   Widget _buildAdminProfile() {
-    // Animasi tinggi profil dengan ClipRect agar terpotong rapi saat collapse
     return ClipRect(
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
@@ -214,7 +397,6 @@ class _SidebarState extends State<Sidebar> {
                       'assets/Logo MTS.png',
                       width: 30,
                       height: 30,
-                      // Fallback jika gambar error/belum load
                       errorBuilder: (ctx, err, stack) =>
                           const Icon(Icons.account_circle, size: 30),
                     ),
@@ -270,7 +452,7 @@ class _SidebarState extends State<Sidebar> {
             ? AppColors.error.withValues(alpha: 0.05)
             : AppColors.primary.withValues(alpha: 0.05),
         child: Container(
-          height: 50,
+          height: 48,
           decoration: BoxDecoration(
             border: isSelected && !_isCollapsed
                 ? const Border(
@@ -279,19 +461,20 @@ class _SidebarState extends State<Sidebar> {
                 : null,
           ),
           child: Row(
-            // Jika collapsed, center content. Jika expanded, start.
             mainAxisAlignment: _isCollapsed
                 ? MainAxisAlignment.center
                 : MainAxisAlignment.start,
             children: [
-              // AREA ICON
-              // Lebar diset 60 (bukan 70) agar aman dari border 1px sidebar
               SizedBox(
                 width: _iconAreaWidth,
-                child: Center(child: Icon(icon, color: itemColor, size: 24)),
+                child: Center(
+                  child: Tooltip(
+                    message: title,
+                    waitDuration: const Duration(milliseconds: 400),
+                    child: Icon(icon, color: itemColor, size: 24),
+                  ),
+                ),
               ),
-
-              // AREA TEXT
               if (!_isCollapsed)
                 Expanded(
                   child: Padding(

@@ -24,7 +24,8 @@ import 'web_admin/data/data_siswa.dart';
 import 'web_admin/data/data_absensi.dart';
 import 'web_admin/data/data_surat.dart';
 import 'web_admin/data/data_notifikasi_test.dart';
-import 'web_admin/placeholder.dart';
+import 'web_admin/data/data_profil.dart';
+import 'web_admin/presentation/pages/password_recovery_screen.dart';
 
 final supabase = Supabase.instance.client;
 
@@ -42,6 +43,9 @@ Future<void> main() async {
   await Supabase.initialize(
     url: AppConstants.supabaseUrl,
     anonKey: AppConstants.supabaseAnonKey,
+    authOptions: const FlutterAuthClientOptions(
+      authFlowType: AuthFlowType.implicit,
+    ),
   );
 
   // 2. Setup Desktop
@@ -121,11 +125,51 @@ class MyApp extends StatelessWidget {
   }
 }
 
-class AuthGate extends StatelessWidget {
+class AuthGate extends StatefulWidget {
   const AuthGate({super.key});
 
   @override
+  State<AuthGate> createState() => _AuthGateState();
+}
+
+class _AuthGateState extends State<AuthGate> {
+  late bool _isPasswordRecovery;
+
+  @override
+  void initState() {
+    super.initState();
+    // Deteksi instan jika halaman dibuka dari URL reset password (?code=... atau type=recovery)
+    final uri = Uri.base;
+    _isPasswordRecovery = (kIsWeb && uri.queryParameters.containsKey('code')) ||
+        (kIsWeb && uri.queryParameters['type'] == 'recovery') ||
+        (kIsWeb && uri.fragment.contains('type=recovery'));
+
+    // Listen ke event stream Supabase jika event recovery terpicu
+    supabase.auth.onAuthStateChange.listen((data) {
+      if (data.event == AuthChangeEvent.passwordRecovery) {
+        if (mounted) {
+          setState(() {
+            _isPasswordRecovery = true;
+          });
+        }
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (_isPasswordRecovery) {
+      return PasswordRecoveryScreen(
+        onSuccess: () {
+          if (mounted) {
+            setState(() {
+              _isPasswordRecovery = false;
+            });
+          }
+        },
+      );
+    }
+
     return StreamBuilder<AuthState>(
       stream: supabase.auth.onAuthStateChange,
       builder: (context, snapshot) {
@@ -155,7 +199,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   String? _selectedKelasId;
 
   void _onMenuSelected(int index) async {
-    if (index == 7) {
+    if (index == 8) {
       await supabase.auth.signOut();
       return;
     }
@@ -176,7 +220,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
   @override
   Widget build(BuildContext context) {
-    // Mapping halaman menggunakan Constants untuk nama sekolah
     final List<Widget> pages = [
       const DashboardScreen(),
       const PageAbsensi(
@@ -199,12 +242,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       const NotifikasiTestPage(
         schoolName: AppConstants.schoolName,
       ),
-      const SizedBox(),
+      ProfilAdminPage(
+        schoolName: AppConstants.schoolName,
+      ),
     ];
 
-    final Widget content = (_selectedIndex < pages.length)
-        ? pages[_selectedIndex]
-        : const PlaceholderScreen(title: 'Halaman Tidak Ditemukan');
+    final int safeIndex = (_selectedIndex < pages.length && _selectedIndex >= 0)
+        ? _selectedIndex
+        : 0;
 
     return Scaffold(
       body: Row(
@@ -216,12 +261,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           Expanded(
             child: Container(
               color: const Color(0xFFf5f7fa),
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 300),
-                child: KeyedSubtree(
-                  key: ValueKey<int>(_selectedIndex),
-                  child: content,
-                ),
+              child: IndexedStack(
+                index: safeIndex,
+                children: pages,
               ),
             ),
           ),

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -57,7 +58,10 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final email = _emailController.text.trim();
+      final rawEmail = _emailController.text.trim();
+      final email = rawEmail.endsWith('@gmail.com')
+          ? rawEmail
+          : (rawEmail.contains('@') ? rawEmail : '$rawEmail@gmail.com');
       final password = _passwordController.text.trim();
 
       // Eksekusi Login ke Supabase
@@ -87,6 +91,593 @@ class _LoginScreenState extends State<LoginScreen> {
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  void _showForgotPasswordDialog() {
+    final initialEmail =
+        _emailController.text.trim().replaceAll('@gmail.com', '');
+    final resetEmailController =
+        TextEditingController(text: initialEmail);
+    final resetFormKey = GlobalKey<FormState>();
+    bool isResetting = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.lock_reset_rounded,
+                  color: AppColors.primary,
+                  size: 26,
+                ),
+              ),
+              const SizedBox(width: 14),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Lupa Password Admin?',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primaryDark,
+                      ),
+                    ),
+                    Text(
+                      'Reset Kata Sandi Akun',
+                      style: TextStyle(fontSize: 12, color: AppColors.textGrey),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          content: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: Form(
+              key: resetFormKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Masukkan nama email admin terdaftar. Kami akan mengirimkan tautan untuk mengatur ulang kata sandi Anda.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppColors.textDark,
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  TextFormField(
+                    controller: resetEmailController,
+                    autofocus: true,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: AppStyles.inputDecoration(
+                      'Nama Email Admin',
+                      Icons.email_outlined,
+                    ).copyWith(
+                      hintText: 'email',
+                      suffixText: '@gmail.com',
+                      suffixStyle: const TextStyle(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                      ),
+                    ),
+                    validator: (val) {
+                      if (val == null || val.trim().isEmpty) {
+                        return 'Nama email wajib diisi';
+                      }
+                      return null;
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actionsPadding:
+              const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          actions: [
+            TextButton(
+              onPressed:
+                  isResetting ? null : () => Navigator.pop(dialogCtx),
+              child: const Text(
+                'Batal',
+                style: TextStyle(color: Colors.grey),
+              ),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
+              ),
+              onPressed: isResetting
+                  ? null
+                  : () async {
+                      if (!resetFormKey.currentState!.validate()) return;
+                      setDialogState(() => isResetting = true);
+
+                      final rawEmail = resetEmailController.text.trim();
+                      final email = rawEmail.endsWith('@gmail.com')
+                          ? rawEmail
+                          : (rawEmail.contains('@')
+                              ? rawEmail
+                              : '$rawEmail@gmail.com');
+                      try {
+                        await Supabase.instance.client.auth
+                            .resetPasswordForEmail(
+                          email,
+                          redirectTo:
+                              kIsWeb ? Uri.base.origin : null,
+                        );
+
+                        if (!dialogCtx.mounted) return;
+                        Navigator.pop(dialogCtx);
+
+                        if (!context.mounted) return;
+                        showDialog(
+                          context: context,
+                          builder: (successCtx) => AlertDialog(
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            title: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.green
+                                        .withValues(alpha: 0.1),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.mark_email_read_rounded,
+                                    color: Colors.green,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                const Text(
+                                  'Email Terkirim',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 18,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            content: Text(
+                              'Tautan untuk mereset kata sandi telah dikirim ke $email.\n\nSilakan periksa kotak masuk (Inbox) atau folder Spam pada email Anda untuk melanjutkan.',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                height: 1.5,
+                              ),
+                            ),
+                            actions: [
+                              ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.primary,
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                onPressed: () =>
+                                    Navigator.pop(successCtx),
+                                child: const Text('Mengerti'),
+                              ),
+                            ],
+                          ),
+                        );
+                      } on AuthException catch (e) {
+                        setDialogState(() => isResetting = false);
+                        _showErrorSnackBar(
+                          'Gagal mengirim reset password: ${e.message}',
+                        );
+                      } catch (e) {
+                        setDialogState(() => isResetting = false);
+                        _showErrorSnackBar(
+                          'Terjadi kesalahan saat memproses permintaan.',
+                        );
+                      }
+                    },
+              child: isResetting
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Text(
+                      'Kirim Link Reset',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showChangeEmailDialog() {
+    final typedEmail = _emailController.text.trim();
+    final initialOldEmail = typedEmail.isEmpty
+        ? ''
+        : (typedEmail.contains('@') ? typedEmail : '$typedEmail@gmail.com');
+    final oldEmailController = TextEditingController(text: initialOldEmail);
+    final passwordController = TextEditingController();
+    final newEmailController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    bool isSubmitting = false;
+    bool obscureCurrentPassword = true;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.mark_email_unread_rounded,
+                  color: AppColors.primary,
+                  size: 26,
+                ),
+              ),
+              const SizedBox(width: 14),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Ganti Email Admin',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primaryDark,
+                      ),
+                    ),
+                    Text(
+                      'Verifikasi akun & ubah alamat email',
+                      style: TextStyle(fontSize: 12, color: AppColors.textGrey),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          content: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 440),
+            child: Form(
+              key: formKey,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Masukkan email lengkap saat ini, password verifikasi, dan nama email baru Anda.',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: AppColors.textDark,
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // 1. Email Lama (Tanpa suffix permanen @gmail.com)
+                    TextFormField(
+                      controller: oldEmailController,
+                      keyboardType: TextInputType.emailAddress,
+                      decoration: AppStyles.inputDecoration(
+                        'Email Saat Ini (Lengkap)',
+                        Icons.email_outlined,
+                      ).copyWith(
+                        hintText: 'admin@contoh.com',
+                      ),
+                      validator: (val) {
+                        if (val == null || val.trim().isEmpty) {
+                          return 'Email saat ini wajib diisi';
+                        }
+                        if (!val.contains('@')) {
+                          return 'Format email tidak valid (harus menyertakan @)';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+
+                    // 2. Password Saat Ini (Verifikasi Keamanan)
+                    TextFormField(
+                      controller: passwordController,
+                      obscureText: obscureCurrentPassword,
+                      decoration: AppStyles.inputDecoration(
+                        'Password Akun Admin',
+                        Icons.lock_outline,
+                      ).copyWith(
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            obscureCurrentPassword
+                                ? Icons.visibility_off
+                                : Icons.visibility,
+                            color: Colors.grey,
+                          ),
+                          onPressed: () => setDialogState(() =>
+                              obscureCurrentPassword =
+                                  !obscureCurrentPassword),
+                        ),
+                      ),
+                      validator: (val) {
+                        if (val == null || val.isEmpty) {
+                          return 'Password wajib diisi untuk verifikasi';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+
+                    // 3. Email Baru (dengan suffix @gmail.com)
+                    TextFormField(
+                      controller: newEmailController,
+                      keyboardType: TextInputType.emailAddress,
+                      decoration: AppStyles.inputDecoration(
+                        'Nama Email Baru',
+                        Icons.alternate_email_rounded,
+                      ).copyWith(
+                        hintText: 'email_baru',
+                        suffixText: '@gmail.com',
+                        suffixStyle: const TextStyle(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                        ),
+                      ),
+                      validator: (val) {
+                        if (val == null || val.trim().isEmpty) {
+                          return 'Nama email baru wajib diisi';
+                        }
+                        final rawOld = oldEmailController.text.trim();
+                        final rawNew = val.trim();
+                        final newFull = rawNew.endsWith('@gmail.com')
+                            ? rawNew
+                            : '$rawNew@gmail.com';
+                        if (rawOld.toLowerCase() == newFull.toLowerCase()) {
+                          return 'Email baru tidak boleh sama dengan email saat ini';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Info Box Verifikasi
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.blue.shade100),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            Icons.info_outline_rounded,
+                            size: 18,
+                            color: Colors.blue.shade800,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Tautan verifikasi akan dikirimkan ke email baru untuk mengonfirmasi perubahan sebelum aktif. Setelah verifikasi, silakan login dengan email baru.',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.blue.shade900,
+                                height: 1.4,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          actionsPadding:
+              const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          actions: [
+            TextButton(
+              onPressed:
+                  isSubmitting ? null : () => Navigator.pop(dialogCtx),
+              child: const Text(
+                'Batal',
+                style: TextStyle(color: Colors.grey),
+              ),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
+              ),
+              onPressed: isSubmitting
+                  ? null
+                  : () async {
+                      if (!formKey.currentState!.validate()) return;
+                      setDialogState(() => isSubmitting = true);
+
+                      final oldFullEmail = oldEmailController.text.trim();
+                      final password = passwordController.text.trim();
+
+                      final rawNew = newEmailController.text.trim();
+                      final newFullEmail = rawNew.endsWith('@gmail.com')
+                          ? rawNew
+                          : (rawNew.contains('@')
+                              ? rawNew
+                              : '$rawNew@gmail.com');
+
+                      // Gunakan isolated SupabaseClient agar tidak mengubah session global AuthGate (tidak langsung masuk ke dashboard)
+                      final tempClient = SupabaseClient(
+                        AppConstants.supabaseUrl,
+                        AppConstants.supabaseAnonKey,
+                      );
+
+                      try {
+                        // 1. Verifikasi kredensial saat ini dengan login pada client terisolasi
+                        final authRes = await tempClient.auth.signInWithPassword(
+                          email: oldFullEmail,
+                          password: password,
+                        );
+
+                        if (authRes.user == null) {
+                          throw const AuthException(
+                              'Verifikasi gagal, email atau password salah.');
+                        }
+
+                        // 2. Ajukan penggantian email ke Supabase
+                        await tempClient.auth.updateUser(
+                          UserAttributes(email: newFullEmail),
+                        );
+
+                        // 3. Sign out dari client terisolasi
+                        await tempClient.auth.signOut();
+
+                        // 4. Pastikan juga sesi global utama tetap signed out
+                        await Supabase.instance.client.auth.signOut();
+
+                        if (!dialogCtx.mounted) return;
+                        Navigator.pop(dialogCtx);
+
+                        if (!context.mounted) return;
+                        showDialog(
+                          context: context,
+                          builder: (successCtx) => AlertDialog(
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            title: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.green
+                                        .withValues(alpha: 0.1),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.mark_email_read_rounded,
+                                    color: Colors.green,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                const Text(
+                                  'Verifikasi Terkirim',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 18,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            content: Text(
+                              'Permintaan ganti email dari $oldFullEmail ke $newFullEmail berhasil diajukan.\n\nSilakan buka kotak masuk (Inbox) atau folder Spam pada email $newFullEmail untuk mengonfirmasi perubahan.\n\nSetelah dikonfirmasi, silakan login kembali menggunakan alamat email baru Anda.',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                height: 1.5,
+                              ),
+                            ),
+                            actions: [
+                              ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.primary,
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                onPressed: () {
+                                  Navigator.pop(successCtx);
+                                  // Update input email di form login dengan nama email baru
+                                  _emailController.text = rawNew.replaceAll('@gmail.com', '');
+                                  _passwordController.clear();
+                                },
+                                child: const Text('Mengerti & Kembali ke Login'),
+                              ),
+                            ],
+                          ),
+                        );
+                      } on AuthException catch (e) {
+                        setDialogState(() => isSubmitting = false);
+                        String msg = 'Gagal mengganti email: ${e.message}';
+                        if (e.message.contains('Invalid login credentials')) {
+                          msg =
+                              'Email lama atau password admin yang dimasukkan salah.';
+                        }
+                        _showErrorSnackBar(msg);
+                      } catch (e) {
+                        setDialogState(() => isSubmitting = false);
+                        _showErrorSnackBar(
+                          'Terjadi kesalahan saat memproses permintaan: $e',
+                        );
+                      }
+                    },
+              child: isSubmitting
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Text(
+                      'Verifikasi & Ganti Email',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -150,26 +741,31 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                               const SizedBox(height: 30),
 
-                              // Input Email
+                              // Input Email dengan akhiran permanen @gmail.com
                               TextFormField(
                                 controller: _emailController,
                                 focusNode: _emailFocus,
                                 decoration: AppStyles.inputDecoration(
-                                  'Email',
+                                  'Nama Email',
                                   Icons.email_outlined,
+                                ).copyWith(
+                                  hintText: 'email',
+                                  suffixText: '@gmail.com',
+                                  suffixStyle: const TextStyle(
+                                    color: AppColors.primary,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 14,
+                                  ),
                                 ),
                                 keyboardType: TextInputType.emailAddress,
                                 textInputAction: TextInputAction.next,
-                                autofillHints: const [AutofillHints.email],
+                                autofillHints: const [AutofillHints.username],
                                 onFieldSubmitted: (_) => FocusScope.of(
                                   context,
                                 ).requestFocus(_passwordFocus),
                                 validator: (value) {
-                                  if (value == null || value.isEmpty) {
-                                    return 'Email wajib diisi';
-                                  }
-                                  if (!value.contains('@')) {
-                                    return 'Format email tidak valid';
+                                  if (value == null || value.trim().isEmpty) {
+                                    return 'Nama email wajib diisi';
                                   }
                                   return null;
                                 },
@@ -211,7 +807,61 @@ class _LoginScreenState extends State<LoginScreen> {
                                   return null;
                                 },
                               ),
-                              const SizedBox(height: 30),
+                              const SizedBox(height: 10),
+
+                              // Forgot Password & Change Email Links
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  TextButton.icon(
+                                    onPressed: _showChangeEmailDialog,
+                                    style: TextButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 4,
+                                        vertical: 2,
+                                      ),
+                                      minimumSize: Size.zero,
+                                      tapTargetSize:
+                                          MaterialTapTargetSize.shrinkWrap,
+                                    ),
+                                    icon: const Icon(
+                                      Icons.alternate_email_rounded,
+                                      size: 14,
+                                      color: AppColors.primary,
+                                    ),
+                                    label: const Text(
+                                      'Ganti Email?',
+                                      style: TextStyle(
+                                        color: AppColors.primary,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                  TextButton(
+                                    onPressed: _showForgotPasswordDialog,
+                                    style: TextButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 4,
+                                        vertical: 2,
+                                      ),
+                                      minimumSize: Size.zero,
+                                      tapTargetSize:
+                                          MaterialTapTargetSize.shrinkWrap,
+                                    ),
+                                    child: const Text(
+                                      'Lupa Password?',
+                                      style: TextStyle(
+                                        color: AppColors.primary,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 24),
 
                               // Tombol Login
                               SizedBox(
