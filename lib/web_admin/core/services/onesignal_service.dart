@@ -35,6 +35,23 @@ class OneSignalService {
   static bool get isConfigured =>
       appId.trim().isNotEmpty && restApiKey.trim().isNotEmpty;
 
+  /// Verify connection to OneSignal REST API
+  static Future<bool> verifyConnection() async {
+    if (!isConfigured) return false;
+    try {
+      final url = Uri.parse('$_baseUrl/apps/$appId');
+      final resp = await http.get(
+        url,
+        headers: {
+          'Authorization': 'Key $restApiKey',
+        },
+      );
+      return resp.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Send push notification via OneSignal REST API
   /// 
   /// [title] Notification headline/title

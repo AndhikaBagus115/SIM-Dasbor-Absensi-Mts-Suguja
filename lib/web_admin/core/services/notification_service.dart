@@ -115,6 +115,11 @@ class ParentNotification {
 class NotificationService {
   static final SupabaseClient _supabase = Supabase.instance.client;
 
+  /// Check if WAHA configuration is present
+  static bool get isWahaConfigured =>
+      WahaConfig.baseUrl.trim().isNotEmpty &&
+      WahaConfig.session.trim().isNotEmpty;
+
   // ============================================================
   // WHATSAPP HELPERS
   // ============================================================
