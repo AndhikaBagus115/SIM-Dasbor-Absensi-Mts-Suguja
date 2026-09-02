@@ -3,6 +3,17 @@ import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../constants.dart';
 import 'logging_service.dart';
+import 'onesignal_service.dart';
+
+/// Notification Channel Mode
+enum NotificationChannel {
+  whatsapp('WhatsApp'),
+  onesignal('Push Notifikasi (Aplikasi)'),
+  both('Keduanya (WA + Push)');
+
+  final String displayName;
+  const NotificationChannel(this.displayName);
+}
 
 /// Type of notification to send
 enum NotificationType {
@@ -19,13 +30,13 @@ enum NotificationType {
 class WahaConfig {
   /// Base URL for WAHA API (retrieved dynamically from environment)
   static String get baseUrl => AppConstants.wahaBaseUrl;
-  
+
   /// Session name for WAHA
   static String get session => AppConstants.wahaSession;
-  
+
   /// Endpoint for sending text messages
   static const String sendTextEndpoint = '/api/sendText';
-  
+
   /// API Key for WAHA authentication (retrieved dynamically from environment)
   static String get apiKey => AppConstants.wahaApiKey;
 }
@@ -37,6 +48,7 @@ class ParentNotification {
   final String parentPhoneNumber;
   final String studentName;
   final NotificationType type;
+  final NotificationChannel channel;
   final DateTime notificationDate;
   final String? message;
   final bool isSent;
@@ -49,6 +61,7 @@ class ParentNotification {
     required this.parentPhoneNumber,
     required this.studentName,
     required this.type,
+    this.channel = NotificationChannel.whatsapp,
     required this.notificationDate,
     this.message,
     required this.isSent,
@@ -65,6 +78,10 @@ class ParentNotification {
       type: NotificationType.values.firstWhere(
         (t) => t.name == (json['type'] as String?),
         orElse: () => NotificationType.present,
+      ),
+      channel: NotificationChannel.values.firstWhere(
+        (c) => c.name == (json['channel'] as String?),
+        orElse: () => NotificationChannel.whatsapp,
       ),
       notificationDate: json['notification_date'] != null
           ? DateTime.parse(json['notification_date'] as String)
@@ -84,6 +101,7 @@ class ParentNotification {
     'parent_phone_number': parentPhoneNumber,
     'student_name': studentName,
     'type': type.name,
+    'channel': channel.name,
     'notification_date': notificationDate.toIso8601String(),
     'message': message,
     'is_sent': isSent,
@@ -93,32 +111,32 @@ class ParentNotification {
 }
 
 /// Service for sending notifications to parents (Orang Tua) after student attendance
+/// Supports WhatsApp (via WAHA) and In-App Push Notifications (via OneSignal)
 class NotificationService {
+  static final SupabaseClient _supabase = Supabase.instance.client;
+
+  // ============================================================
+  // WHATSAPP HELPERS
+  // ============================================================
+
   /// Format phone number for WhatsApp (WAHA format)
   /// Converts Indonesian phone numbers to WhatsApp chatId format
   /// Example: 08123456789 -> 628123456789@c.us
   static String _formatPhoneNumberForWhatsApp(String phoneNumber) {
-    // Remove all non-numeric characters
     String cleaned = phoneNumber.replaceAll(RegExp(r'[^\d]'), '');
-    
-    // Handle Indonesian phone numbers
+
     if (cleaned.startsWith('0')) {
-      // Replace leading 0 with 62 (Indonesia country code)
       cleaned = '62${cleaned.substring(1)}';
     } else if (cleaned.startsWith('8')) {
-      // Add 62 prefix if starting with 8
       cleaned = '62$cleaned';
     } else if (!cleaned.startsWith('62')) {
-      // Add 62 if no country code
       cleaned = '62$cleaned';
     }
-    
-    // Return in WAHA chatId format
+
     return '$cleaned@c.us';
   }
 
   /// Send WhatsApp message via WAHA API
-  /// Returns true if message was sent successfully
   static Future<bool> _sendWhatsAppMessage({
     required String phoneNumber,
     required String message,
@@ -126,18 +144,16 @@ class NotificationService {
     try {
       final chatId = _formatPhoneNumberForWhatsApp(phoneNumber);
       final url = Uri.parse('${WahaConfig.baseUrl}${WahaConfig.sendTextEndpoint}');
-      
+
       log.info(
         'Sending WhatsApp message to: $chatId',
         tag: 'NotificationService',
       );
 
-      // Build headers with API Key authentication
       final headers = <String, String>{
         'Content-Type': 'application/json',
       };
-      
-      // Add API Key if configured
+
       if (WahaConfig.apiKey.isNotEmpty) {
         headers['X-Api-Key'] = WahaConfig.apiKey;
       }
@@ -176,58 +192,118 @@ class NotificationService {
     }
   }
 
-  /// Send notification to parent via WhatsApp using WAHA API
-  /// 
-  /// Returns true if notification was sent successfully
+  /// Public method to send a direct WhatsApp message
+  static Future<bool> sendDirectWhatsApp({
+    required String phoneNumber,
+    required String message,
+  }) async {
+    return _sendWhatsAppMessage(
+      phoneNumber: phoneNumber,
+      message: message,
+    );
+  }
+
+  // ============================================================
+  // UNIFIED SENDING METHODS (MULTI-CHANNEL)
+  // ============================================================
+
+  /// Send notification to parent via selected channel (WhatsApp, OneSignal Push, or Both)
   static Future<bool> sendNotificationToParent({
     required String parentPhoneNumber,
     required String studentName,
     required NotificationType type,
     required String schoolName,
+    int? siswaId,
+    String? nis,
     String? customMessage,
+    String? alasan,
     String? waktuPulang,
+    NotificationChannel channel = NotificationChannel.whatsapp,
   }) async {
-    try {
-      log.info(
-        'Sending notification to parent: $parentPhoneNumber for student: $studentName (${type.displayName})',
-        tag: 'NotificationService',
-      );
+    bool waSuccess = false;
+    bool pushSuccess = false;
 
-      // Build WhatsApp message
-      final message = customMessage ?? _buildNotificationMessage(
+    // 1. Send via WhatsApp if selected
+    if (channel == NotificationChannel.whatsapp || channel == NotificationChannel.both) {
+      if (parentPhoneNumber.isNotEmpty) {
+        final message = _buildNotificationMessage(
+          studentName: studentName,
+          type: type,
+          schoolName: schoolName,
+          waktuPulang: waktuPulang,
+          customMessage: customMessage,
+          alasan: alasan,
+        );
+
+        waSuccess = await _sendWhatsAppMessage(
+          phoneNumber: parentPhoneNumber,
+          message: message,
+        );
+      } else {
+        log.warning(
+          'No phone number available for WhatsApp notification ($studentName)',
+          tag: 'NotificationService',
+        );
+      }
+    }
+
+    // 2. Send via OneSignal Push Notification if selected
+    if (channel == NotificationChannel.onesignal || channel == NotificationChannel.both) {
+      final pushTitle = _buildPushTitle(
+        type: type,
+        studentName: studentName,
+        alasan: alasan,
+      );
+      final pushBody = _buildPushBody(
         studentName: studentName,
         type: type,
         schoolName: schoolName,
         waktuPulang: waktuPulang,
+        customMessage: customMessage,
+        alasan: alasan,
       );
 
-      log.info(
-        'Notification message: $message',
-        tag: 'NotificationService',
-      );
-
-      // Send via WAHA WhatsApp API
-      final success = await _sendWhatsAppMessage(
-        phoneNumber: parentPhoneNumber,
-        message: message,
-      );
-      
-      if (success) {
-        log.info(
-          'Notification sent successfully to: $parentPhoneNumber',
-          tag: 'NotificationService',
+      if (siswaId != null) {
+        final pushResult = await OneSignalService.sendPushToSiswa(
+          siswaId: siswaId,
+          nis: nis,
+          title: pushTitle,
+          message: pushBody,
+          data: {
+            'type': type.name,
+            'school_name': schoolName,
+            'student_name': studentName,
+            if (customMessage != null) 'custom_message': customMessage,
+            if (alasan != null) 'alasan': alasan,
+          },
         );
+        pushSuccess = pushResult.success;
+      } else {
+        // Broadcast push if no specific siswaId is provided
+        final pushResult = await OneSignalService.sendBroadcastPush(
+          title: pushTitle,
+          message: pushBody,
+          data: {
+            'type': type.name,
+            'school_name': schoolName,
+            'student_name': studentName,
+            if (customMessage != null) 'custom_message': customMessage,
+            if (alasan != null) 'alasan': alasan,
+          },
+        );
+        pushSuccess = pushResult.success;
       }
+    }
 
-      return success;
-    } catch (e, stackTrace) {
-      log.error(
-        'Failed to send notification to parent',
-        error: e,
-        stackTrace: stackTrace,
-        tag: 'NotificationService',
-      );
-      return false;
+    // Return overall success based on requested channel
+    switch (channel) {
+      case NotificationChannel.whatsapp:
+        return waSuccess;
+      case NotificationChannel.onesignal:
+        return pushSuccess;
+      case NotificationChannel.both:
+        // Returns true if at least one channel succeeded
+        return waSuccess || pushSuccess;
     }
   }
 
@@ -237,6 +313,10 @@ class NotificationService {
     required String studentName,
     required String schoolName,
     required String waktuPulang,
+    int? siswaId,
+    String? nis,
+    String? customMessage,
+    NotificationChannel channel = NotificationChannel.whatsapp,
   }) async {
     return sendNotificationToParent(
       parentPhoneNumber: parentPhoneNumber,
@@ -244,6 +324,10 @@ class NotificationService {
       type: NotificationType.pulang,
       schoolName: schoolName,
       waktuPulang: waktuPulang,
+      siswaId: siswaId,
+      nis: nis,
+      customMessage: customMessage,
+      channel: channel,
     );
   }
 
@@ -251,10 +335,7 @@ class NotificationService {
   // DATABASE INTEGRATION METHODS
   // ============================================================
 
-  static final SupabaseClient _supabase = Supabase.instance.client;
-
-  /// Get student data with parent phone number from database
-  /// Returns student info including parent phone number
+  /// Get student data from database
   static Future<Map<String, dynamic>?> _getStudentWithParentPhone(int siswaId) async {
     try {
       final response = await _supabase
@@ -262,7 +343,7 @@ class NotificationService {
           .select('id, nis, nama, orang_tua_nama, orang_tua_nomor, kelas(nama_kelas)')
           .eq('id', siswaId)
           .single();
-      
+
       return response;
     } catch (e, stackTrace) {
       log.error(
@@ -275,18 +356,19 @@ class NotificationService {
     }
   }
 
-  /// Send notification to parent by student ID (fetches phone from database)
-  /// This is the main method to use when you have a siswa_id
+  /// Send notification by student ID (fetches phone & NIS from database)
   static Future<bool> sendNotificationBySiswaId({
     required int siswaId,
     required NotificationType type,
     required String schoolName,
+    String? customMessage,
+    String? alasan,
     String? waktuPulang,
+    NotificationChannel channel = NotificationChannel.whatsapp,
   }) async {
     try {
-      // Fetch student data from database
       final studentData = await _getStudentWithParentPhone(siswaId);
-      
+
       if (studentData == null) {
         log.error(
           'Student not found for id: $siswaId',
@@ -295,10 +377,11 @@ class NotificationService {
         return false;
       }
 
-      final parentPhone = studentData['orang_tua_nomor'] as String?;
+      final parentPhone = studentData['orang_tua_nomor'] as String? ?? '';
       final studentName = studentData['nama'] as String? ?? 'Siswa';
+      final nis = studentData['nis'] as String?;
 
-      if (parentPhone == null || parentPhone.isEmpty) {
+      if (channel == NotificationChannel.whatsapp && parentPhone.isEmpty) {
         log.warning(
           'Parent phone number not found for student: $studentName (ID: $siswaId)',
           tag: 'NotificationService',
@@ -306,13 +389,17 @@ class NotificationService {
         return false;
       }
 
-      // Send notification
       return sendNotificationToParent(
         parentPhoneNumber: parentPhone,
         studentName: studentName,
         type: type,
         schoolName: schoolName,
+        siswaId: siswaId,
+        nis: nis,
+        customMessage: customMessage,
+        alasan: alasan,
         waktuPulang: waktuPulang,
+        channel: channel,
       );
     } catch (e, stackTrace) {
       log.error(
@@ -329,11 +416,15 @@ class NotificationService {
   static Future<bool> sendHadirNotification({
     required int siswaId,
     required String schoolName,
+    String? customMessage,
+    NotificationChannel channel = NotificationChannel.whatsapp,
   }) async {
     return sendNotificationBySiswaId(
       siswaId: siswaId,
       type: NotificationType.present,
       schoolName: schoolName,
+      customMessage: customMessage,
+      channel: channel,
     );
   }
 
@@ -341,11 +432,17 @@ class NotificationService {
   static Future<bool> sendAbsentNotification({
     required int siswaId,
     required String schoolName,
+    String? customMessage,
+    String? alasan,
+    NotificationChannel channel = NotificationChannel.whatsapp,
   }) async {
     return sendNotificationBySiswaId(
       siswaId: siswaId,
       type: NotificationType.absent,
       schoolName: schoolName,
+      customMessage: customMessage,
+      alasan: alasan,
+      channel: channel,
     );
   }
 
@@ -353,45 +450,52 @@ class NotificationService {
   static Future<bool> sendLateNotification({
     required int siswaId,
     required String schoolName,
+    String? customMessage,
+    NotificationChannel channel = NotificationChannel.whatsapp,
   }) async {
     return sendNotificationBySiswaId(
       siswaId: siswaId,
       type: NotificationType.late,
       schoolName: schoolName,
+      customMessage: customMessage,
+      channel: channel,
     );
   }
 
-  /// Send pulang/going home notification by student ID
+  /// Send pulang notification by student ID
   static Future<bool> sendPulangNotificationBySiswaId({
     required int siswaId,
     required String schoolName,
+    String? customMessage,
     String? waktuPulang,
+    NotificationChannel channel = NotificationChannel.whatsapp,
   }) async {
     return sendNotificationBySiswaId(
       siswaId: siswaId,
       type: NotificationType.pulang,
       schoolName: schoolName,
+      customMessage: customMessage,
       waktuPulang: waktuPulang,
+      channel: channel,
     );
   }
 
   /// Send notifications for all absent students today
-  /// Fetches absent students from database and sends notifications
   static Future<void> sendNotificationsForAbsentStudentsToday({
     required String schoolName,
+    NotificationChannel channel = NotificationChannel.onesignal,
   }) async {
     try {
       final today = DateTime.now().toIso8601String().split('T')[0];
-      
-      // Get all absent students today
+
       final absentRecords = await _supabase
           .from('absensi')
-          .select('siswa_id, siswa(id, nama, orang_tua_nomor)')
+          .select('siswa_id, siswa(id, nis, nama, orang_tua_nomor)')
           .eq('tanggal', today)
           .eq('status', 'alpa');
 
       log.info(
-        'Found ${(absentRecords as List).length} absent students today',
+        'Found ${(absentRecords as List).length} absent students today. Sending via ${channel.displayName}',
         tag: 'NotificationService',
       );
 
@@ -399,20 +503,23 @@ class NotificationService {
         final siswa = record['siswa'];
         if (siswa == null) continue;
 
-        final parentPhone = siswa['orang_tua_nomor'] as String?;
+        final parentPhone = siswa['orang_tua_nomor'] as String? ?? '';
         final studentName = siswa['nama'] as String? ?? 'Siswa';
+        final siswaId = siswa['id'] as int?;
+        final nis = siswa['nis'] as String?;
 
-        if (parentPhone != null && parentPhone.isNotEmpty) {
-          await sendNotificationToParent(
-            parentPhoneNumber: parentPhone,
-            studentName: studentName,
-            type: NotificationType.absent,
-            schoolName: schoolName,
-          );
-          
-          // Add small delay to avoid rate limiting
-          await Future.delayed(const Duration(milliseconds: 300));
-        }
+        await sendNotificationToParent(
+          parentPhoneNumber: parentPhone,
+          studentName: studentName,
+          type: NotificationType.absent,
+          schoolName: schoolName,
+          siswaId: siswaId,
+          nis: nis,
+          channel: channel,
+        );
+
+        // Add small delay to avoid rate limiting
+        await Future.delayed(const Duration(milliseconds: 250));
       }
 
       log.info(
@@ -429,12 +536,66 @@ class NotificationService {
     }
   }
 
+  /// Send batch notifications for daily attendance
+  static Future<void> sendDailyAttendanceNotifications({
+    required List<Map<String, dynamic>> absentStudents,
+    required List<Map<String, dynamic>> lateStudents,
+    required String schoolName,
+    NotificationChannel channel = NotificationChannel.onesignal,
+  }) async {
+    try {
+      log.info(
+        'Starting batch notification send (${channel.displayName}): ${absentStudents.length} absent, ${lateStudents.length} late',
+        tag: 'NotificationService',
+      );
+
+      // Absent students
+      for (final student in absentStudents) {
+        await sendNotificationToParent(
+          parentPhoneNumber: student['parent_phone'] as String? ?? '',
+          studentName: student['student_name'] as String,
+          type: NotificationType.absent,
+          schoolName: schoolName,
+          siswaId: student['siswa_id'] as int?,
+          nis: student['nis'] as String?,
+          channel: channel,
+        );
+        await Future.delayed(const Duration(milliseconds: 200));
+      }
+
+      // Late students
+      for (final student in lateStudents) {
+        await sendNotificationToParent(
+          parentPhoneNumber: student['parent_phone'] as String? ?? '',
+          studentName: student['student_name'] as String,
+          type: NotificationType.late,
+          schoolName: schoolName,
+          siswaId: student['siswa_id'] as int?,
+          nis: student['nis'] as String?,
+          channel: channel,
+        );
+        await Future.delayed(const Duration(milliseconds: 200));
+      }
+
+      log.info(
+        'Batch notifications completed',
+        tag: 'NotificationService',
+      );
+    } catch (e, stackTrace) {
+      log.error(
+        'Error sending batch notifications',
+        error: e,
+        stackTrace: stackTrace,
+        tag: 'NotificationService',
+      );
+    }
+  }
+
   // ============================================================
   // TEST METHODS
   // ============================================================
 
   /// Test WAHA connection by sending a test message
-  /// Use this to verify the WAHA API is working
   static Future<bool> testWahaConnection({
     required String testPhoneNumber,
   }) async {
@@ -445,34 +606,46 @@ class NotificationService {
 
     return _sendWhatsAppMessage(
       phoneNumber: testPhoneNumber,
-      message: '''🧪 *TEST KONEKSI WAHA*
+      message: '''*TEST KONEKSI WAHA*
 
-Ini adalah pesan test dari Sistem Absensi.
-Jika Anda menerima pesan ini, berarti koneksi WAHA berhasil!
+Ini adalah pesan test dari Sistem Absensi MTs.
+Jika Anda menerima pesan ini, berarti integrasi WhatsApp Gateway (WAHA) berhasil!
 
-Waktu: ${DateTime.now().toString()}''',
+Waktu: ${DateTime.now().toString().split('.')[0]}''',
     );
   }
 
+  /// Test OneSignal connection
+  static Future<Map<String, dynamic>> testOneSignalConnection() async {
+    return OneSignalService.testConnection();
+  }
+
   /// Test sending notification by siswa ID from database
-  /// Use this to test the full flow: DB -> WAHA -> WhatsApp
   static Future<Map<String, dynamic>> testNotificationBySiswaId({
     required int siswaId,
     required String schoolName,
     NotificationType type = NotificationType.present,
+    NotificationChannel channel = NotificationChannel.both,
+    String? customMessage,
+    String? alasan,
+    String? waktuPulang,
   }) async {
     final result = <String, dynamic>{
       'success': false,
       'siswaId': siswaId,
       'studentName': null,
       'parentPhone': null,
+      'channel': channel.displayName,
       'message': '',
+      'waSuccess': false,
+      'pushSuccess': false,
+      'details': <String>[],
     };
 
     try {
       // 1. Fetch student data
       final studentData = await _getStudentWithParentPhone(siswaId);
-      
+
       if (studentData == null) {
         result['message'] = 'Siswa dengan ID $siswaId tidak ditemukan di database';
         log.error(result['message'] as String, tag: 'NotificationService');
@@ -481,27 +654,76 @@ Waktu: ${DateTime.now().toString()}''',
 
       result['studentName'] = studentData['nama'];
       result['parentPhone'] = studentData['orang_tua_nomor'];
+      final parentPhone = studentData['orang_tua_nomor'] as String? ?? '';
+      final studentName = studentData['nama'] as String? ?? 'Siswa';
+      final nis = studentData['nis'] as String?;
 
-      final parentPhone = studentData['orang_tua_nomor'] as String?;
-      
-      if (parentPhone == null || parentPhone.isEmpty) {
-        result['message'] = 'Nomor orang tua kosong untuk siswa: ${studentData['nama']}';
-        log.warning(result['message'] as String, tag: 'NotificationService');
-        return result;
+      final logDetails = <String>[];
+
+      // 2. Dispatch based on channel
+      if (channel == NotificationChannel.whatsapp || channel == NotificationChannel.both) {
+        if (parentPhone.isNotEmpty) {
+          final message = _buildNotificationMessage(
+            studentName: studentName,
+            type: type,
+            schoolName: schoolName,
+            customMessage: customMessage,
+            alasan: alasan,
+            waktuPulang: waktuPulang,
+          );
+          final waOk = await _sendWhatsAppMessage(
+            phoneNumber: parentPhone,
+            message: message,
+          );
+          result['waSuccess'] = waOk;
+          logDetails.add(waOk ? 'WhatsApp: Terkirim ke $parentPhone' : 'WhatsApp: Gagal kirim');
+        } else {
+          logDetails.add('WhatsApp: Nomor orang tua kosong');
+        }
       }
 
-      // 2. Send notification
-      final success = await sendNotificationToParent(
-        parentPhoneNumber: parentPhone,
-        studentName: studentData['nama'] as String? ?? 'Siswa',
-        type: type,
-        schoolName: schoolName,
-      );
+      if (channel == NotificationChannel.onesignal || channel == NotificationChannel.both) {
+        final pushTitle = _buildPushTitle(
+          type: type,
+          studentName: studentName,
+          alasan: alasan,
+        );
+        final pushBody = _buildPushBody(
+          studentName: studentName,
+          type: type,
+          schoolName: schoolName,
+          waktuPulang: waktuPulang,
+          customMessage: customMessage,
+          alasan: alasan,
+        );
 
-      result['success'] = success;
-      result['message'] = success 
-          ? 'Notifikasi berhasil dikirim ke $parentPhone'
-          : 'Gagal mengirim notifikasi ke $parentPhone';
+        final pushRes = await OneSignalService.sendPushToSiswa(
+          siswaId: siswaId,
+          nis: nis,
+          title: pushTitle,
+          message: pushBody,
+          data: {
+            'type': type.name,
+            'school_name': schoolName,
+            'student_name': studentName,
+            if (customMessage != null) 'custom_message': customMessage,
+            if (alasan != null) 'alasan': alasan,
+          },
+        );
+
+        result['pushSuccess'] = pushRes.success;
+        logDetails.add('OneSignal: ${pushRes.message}');
+      }
+
+      result['details'] = logDetails;
+
+      final isOverallSuccess = (channel == NotificationChannel.whatsapp && result['waSuccess'] == true) ||
+          (channel == NotificationChannel.onesignal && result['pushSuccess'] == true) ||
+          (channel == NotificationChannel.both &&
+              (result['waSuccess'] == true || result['pushSuccess'] == true));
+
+      result['success'] = isOverallSuccess;
+      result['message'] = logDetails.join(' | ');
 
       return result;
     } catch (e, stackTrace) {
@@ -536,129 +758,237 @@ Waktu: ${DateTime.now().toString()}''',
     }
   }
 
-  /// Send batch notifications for daily attendance
-  static Future<void> sendDailyAttendanceNotifications({
-    required List<Map<String, dynamic>> absentStudents,
-    required List<Map<String, dynamic>> lateStudents,
+  // ============================================================
+  // PUBLIC PREVIEW FORMATTING HELPERS
+  // ============================================================
+
+  /// Format preview message for WhatsApp
+  static String formatWhatsAppPreview({
+    required String studentName,
+    required NotificationType type,
     required String schoolName,
-  }) async {
-    try {
-      log.info(
-        'Starting batch notification send: ${absentStudents.length} absent, ${lateStudents.length} late',
-        tag: 'NotificationService',
-      );
+    String? customMessage,
+    String? alasan,
+    String? waktuPulang,
+  }) {
+    return _buildNotificationMessage(
+      studentName: studentName,
+      type: type,
+      schoolName: schoolName,
+      customMessage: customMessage,
+      alasan: alasan,
+      waktuPulang: waktuPulang,
+    );
+  }
 
-      // Send notifications for absent students
-      for (final student in absentStudents) {
-        await sendNotificationToParent(
-          parentPhoneNumber: student['parent_phone'] as String,
-          studentName: student['student_name'] as String,
-          type: NotificationType.absent,
-          schoolName: schoolName,
-        );
-      }
+  /// Format preview body for OneSignal Push Notification
+  static String formatPushPreview({
+    required String studentName,
+    required NotificationType type,
+    required String schoolName,
+    String? customMessage,
+    String? alasan,
+    String? waktuPulang,
+  }) {
+    return _buildPushBody(
+      studentName: studentName,
+      type: type,
+      schoolName: schoolName,
+      customMessage: customMessage,
+      alasan: alasan,
+      waktuPulang: waktuPulang,
+    );
+  }
 
-      // Send notifications for late students
-      for (final student in lateStudents) {
-        await sendNotificationToParent(
-          parentPhoneNumber: student['parent_phone'] as String,
-          studentName: student['student_name'] as String,
-          type: NotificationType.late,
-          schoolName: schoolName,
-        );
-      }
+  /// Format preview title for OneSignal Push Notification
+  static String formatPushTitlePreview({
+    required String studentName,
+    required NotificationType type,
+    String? alasan,
+  }) {
+    return _buildPushTitle(
+      type: type,
+      studentName: studentName,
+      alasan: alasan,
+    );
+  }
 
-      log.info(
-        'Batch notifications completed',
-        tag: 'NotificationService',
-      );
-    } catch (e, stackTrace) {
-      log.error(
-        'Error sending batch notifications',
-        error: e,
-        stackTrace: stackTrace,
-        tag: 'NotificationService',
-      );
+  // ============================================================
+  // MESSAGE FORMATTING HELPERS
+  // ============================================================
+
+  /// Build headline/title for Push Notification
+  static String _buildPushTitle({
+    required NotificationType type,
+    required String studentName,
+    String? alasan,
+  }) {
+    switch (type) {
+      case NotificationType.present:
+        return 'Presensi Masuk: $studentName';
+      case NotificationType.late:
+        return 'Siswa Terlambat: $studentName';
+      case NotificationType.absent:
+        if (alasan != null && alasan.trim().isNotEmpty) {
+          return 'Siswa Tidak Hadir ($alasan): $studentName';
+        }
+        return 'Siswa Tidak Hadir: $studentName';
+      case NotificationType.pulang:
+        return 'Presensi Pulang: $studentName';
     }
   }
 
-  /// Build notification message
+  /// Build concise body for smartphone Push Notification
+  static String _buildPushBody({
+    required String studentName,
+    required NotificationType type,
+    required String schoolName,
+    String? waktuPulang,
+    String? customMessage,
+    String? alasan,
+  }) {
+    final now = DateTime.now();
+    final timeStr =
+        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')} WIB';
+    final dateStr =
+        '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year}';
+
+    final hasCustom = customMessage != null && customMessage.trim().isNotEmpty;
+    final extraNote = hasCustom ? ' Pesan: $customMessage' : '';
+
+    switch (type) {
+      case NotificationType.present:
+        return '$studentName telah tercatat HADIR di $schoolName pada $timeStr ($dateStr).$extraNote';
+      case NotificationType.late:
+        return '$studentName tercatat TERLAMBAT di $schoolName pada $timeStr ($dateStr).$extraNote';
+      case NotificationType.absent:
+        final statusLabel = (alasan != null && alasan.trim().isNotEmpty)
+            ? 'TIDAK HADIR ($alasan)'
+            : 'TIDAK HADIR (Alpa)';
+        return '$studentName $statusLabel di $schoolName pada hari ini ($dateStr).$extraNote';
+      case NotificationType.pulang:
+        return '$studentName telah PULANG dari sekolah pada ${waktuPulang ?? timeStr} ($dateStr).$extraNote';
+    }
+  }
+
+  /// Build formatted WhatsApp text message
   static String _buildNotificationMessage({
     required String studentName,
     required NotificationType type,
     required String schoolName,
     String? waktuPulang,
+    String? customMessage,
+    String? alasan,
   }) {
     final now = DateTime.now();
     final timeStr =
-        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
-    final dateStr = 
+        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')} WIB';
+    final dateStr =
         '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year}';
+
+    final hasCustom = customMessage != null && customMessage.trim().isNotEmpty;
 
     switch (type) {
       case NotificationType.absent:
+        String statusLabel = 'Tidak Hadir (Alpa)';
+        if (alasan != null && alasan.trim().isNotEmpty) {
+          if (alasan.toLowerCase().contains('tidak hadir')) {
+            statusLabel = alasan;
+          } else {
+            statusLabel = 'Tidak Hadir ($alasan)';
+          }
+        }
+
+        final pesanSection = hasCustom
+            ? '''
+
+*Pesan untuk Orang Tua:*
+$customMessage'''
+            : '''
+
+Apabila ada surat izin/keterangan sakit, mohon segera konfirmasi ke pihak sekolah.''';
+
         return '''Assalamu'alaikum Warahmatullahi Wabarakatuh,
 
-📋 *INFORMASI KETIDAKHADIRAN SISWA*
+*INFORMASI KETIDAKHADIRAN SISWA*
 
-👤 Nama Siswa: *$studentName*
-📊 Status: ❌ *Tidak Hadir*
-🏫 Sekolah: $schoolName
-📅 Tanggal: $dateStr
-🕐 Waktu Laporan: $timeStr
-
-Apabila ada pertanyaan, silakan hubungi pihak sekolah.
+Nama Siswa: *$studentName*
+Status: *$statusLabel*
+Sekolah: $schoolName
+Tanggal: $dateStr
+Waktu Laporan: $timeStr$pesanSection
 
 Wassalamu'alaikum Warahmatullahi Wabarakatuh
-_Otomatis dari Sistem Absensi_''';
+_Otomatis dari Sistem Absensi ${schoolName}_''';
 
       case NotificationType.late:
+        final pesanSection = hasCustom
+            ? '''
+
+*Pesan untuk Orang Tua:*
+$customMessage'''
+            : '''
+
+Mohon perhatian Bapak/Ibu untuk kedisiplinan waktu keberangkatan siswa.''';
+
         return '''Assalamu'alaikum Warahmatullahi Wabarakatuh,
 
-📋 *INFORMASI KETERLAMBATAN SISWA*
+*INFORMASI KETERLAMBATAN SISWA*
 
-👤 Nama Siswa: *$studentName*
-📊 Status: ⏰ *Terlambat*
-🏫 Sekolah: $schoolName
-📅 Tanggal: $dateStr
-🕐 Waktu Laporan: $timeStr
-
-Mohon perhatiannya untuk kedisiplinan waktu.
+Nama Siswa: *$studentName*
+Status: *Terlambat*
+Sekolah: $schoolName
+Tanggal: $dateStr
+Waktu Masuk: $timeStr$pesanSection
 
 Wassalamu'alaikum Warahmatullahi Wabarakatuh
-_Otomatis dari Sistem Absensi_''';
+_Otomatis dari Sistem Absensi ${schoolName}_''';
 
       case NotificationType.present:
+        final pesanSection = hasCustom
+            ? '''
+
+*Pesan untuk Orang Tua:*
+$customMessage'''
+            : '''
+
+Terima kasih atas kerja samanya.''';
+
         return '''Assalamu'alaikum Warahmatullahi Wabarakatuh,
 
-📋 *INFORMASI KEHADIRAN SISWA*
+*INFORMASI KEHADIRAN SISWA*
 
-👤 Nama Siswa: *$studentName*
-📊 Status: ✅ *Hadir*
-🏫 Sekolah: $schoolName
-📅 Tanggal: $dateStr
-🕐 Waktu Hadir: $timeStr
-
-Terima kasih.
+Nama Siswa: *$studentName*
+Status: *Hadir Tepat Waktu*
+Sekolah: $schoolName
+Tanggal: $dateStr
+Waktu Hadir: $timeStr$pesanSection
 
 Wassalamu'alaikum Warahmatullahi Wabarakatuh
-_Otomatis dari Sistem Absensi_''';
+_Otomatis dari Sistem Absensi ${schoolName}_''';
 
       case NotificationType.pulang:
+        final pesanSection = hasCustom
+            ? '''
+
+*Pesan untuk Orang Tua:*
+$customMessage'''
+            : '''
+
+Siswa telah selesai mengikuti KBM dan meninggalkan sekolah.''';
+
         return '''Assalamu'alaikum Warahmatullahi Wabarakatuh,
 
-📋 *INFORMASI KEPULANGAN SISWA*
+*INFORMASI KEPULANGAN SISWA*
 
-👤 Nama Siswa: *$studentName*
-📊 Status: 🏠 *Sudah Pulang*
-🏫 Sekolah: $schoolName
-📅 Tanggal: $dateStr
-🕐 Waktu Pulang: ${waktuPulang ?? timeStr}
-
-Siswa telah meninggalkan sekolah dengan selamat.
+Nama Siswa: *$studentName*
+Status: *Sudah Pulang*
+Sekolah: $schoolName
+Tanggal: $dateStr
+Waktu Pulang: ${waktuPulang ?? timeStr}$pesanSection
 
 Wassalamu'alaikum Warahmatullahi Wabarakatuh
-_Otomatis dari Sistem Absensi_''';
+_Otomatis dari Sistem Absensi ${schoolName}_''';
     }
   }
 }

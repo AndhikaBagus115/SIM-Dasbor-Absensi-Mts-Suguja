@@ -82,6 +82,28 @@ class AppConstants {
     return dotenv.env['WAHA_SESSION'] ?? 'default';
   }
 
+  /// Get OneSignal App ID from environment variables or compile-time flags
+  static String get onesignalAppId {
+    const fromEnv = String.fromEnvironment('ONESIGNAL_APP_ID');
+    if (fromEnv.isNotEmpty) return fromEnv;
+    return dotenv.env['ONESIGNAL_APP_ID'] ?? '';
+  }
+
+  /// Get OneSignal REST API Key from environment variables or compile-time flags
+  static String get onesignalRestApiKey {
+    const fromEnv = String.fromEnvironment('ONESIGNAL_REST_API_KEY');
+    if (fromEnv.isNotEmpty) return fromEnv;
+    return dotenv.env['ONESIGNAL_REST_API_KEY'] ?? '';
+  }
+
+  /// Check if OneSignal is configured
+  static bool get isOneSignalConfigured =>
+      onesignalAppId.trim().isNotEmpty && onesignalRestApiKey.trim().isNotEmpty;
+
+  /// Check if WAHA (WhatsApp Gateway) is configured
+  static bool get isWahaConfigured =>
+      wahaBaseUrl.trim().isNotEmpty && wahaApiKey.trim().isNotEmpty;
+
   /// Get application environment (development, staging, production)
   static String get appEnvironment {
     const fromEnv = String.fromEnvironment('APP_ENVIRONMENT');
@@ -103,6 +125,18 @@ abstract class DbTables {
   static const String kelas = 'kelas';
   static const String absensi = 'absensi';
   static const String surat = 'surat';
+  static const String pengumuman = 'pengumuman';
+}
+
+// Database Column Names for Pengumuman
+abstract class PengumumanColumns {
+  static const String id = 'id';
+  static const String judul = 'judul';
+  static const String isi = 'isi';
+  static const String targetTipe = 'target_tipe';
+  static const String targetId = 'target_id';
+  static const String targetNama = 'target_nama';
+  static const String createdAt = 'created_at';
 }
 
 // Database Column Names for Siswa
