@@ -5,16 +5,16 @@ import 'dart:typed_data';
 import 'package:image_picker/image_picker.dart';
 import '../../core/constants.dart';
 
-// --- MODEL KELAS ---
-class Kelas {
+// --- MODEL KELAS OPTION (Untuk MultiSelect) ---
+class KelasOption {
   final String id;
   final String nama;
 
-  Kelas({required this.id, required this.nama});
+  KelasOption({required this.id, required this.nama});
 
   Map<String, dynamic> toJson() => {'id': id, 'nama': nama};
 
-  factory Kelas.fromJson(Map<String, dynamic> json) => Kelas(
+  factory KelasOption.fromJson(Map<String, dynamic> json) => KelasOption(
     id: json['id'] as String? ?? '',
     nama: json['nama'] as String? ?? '',
   );
@@ -22,7 +22,7 @@ class Kelas {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is Kelas && runtimeType == other.runtimeType && id == other.id;
+      other is KelasOption && runtimeType == other.runtimeType && id == other.id;
 
   @override
   int get hashCode => id.hashCode;
@@ -537,7 +537,7 @@ class _FormGuruState extends State<FormGuru> {
   late final TextEditingController _passwordController;
 
   String? _selectedRole;
-  List<Kelas> _selectedKelas = [];
+  List<KelasOption> _selectedKelas = [];
   bool _isUploading = false;
   bool _obscurePassword = true;
 
@@ -545,15 +545,15 @@ class _FormGuruState extends State<FormGuru> {
   String? _existingAvatarUrl;
 
   final List<String> _roleOptions = ['guru', 'admin'];
-  final List<Kelas> _kelasOptions = [
-    Kelas(id: '7A', nama: 'Kelas 7A'),
-    Kelas(id: '7B', nama: 'Kelas 7B'),
-    Kelas(id: '8A', nama: 'Kelas 8A'),
-    Kelas(id: '8B', nama: 'Kelas 8B'),
-    Kelas(id: '9A', nama: 'Kelas 9A'),
-    Kelas(id: '9B', nama: 'Kelas 9B'),
+  final List<KelasOption> _kelasOptions = [
+    KelasOption(id: '7A', nama: 'Kelas 7A'),
+    KelasOption(id: '7B', nama: 'Kelas 7B'),
+    KelasOption(id: '8A', nama: 'Kelas 8A'),
+    KelasOption(id: '8B', nama: 'Kelas 8B'),
+    KelasOption(id: '9A', nama: 'Kelas 9A'),
+    KelasOption(id: '9B', nama: 'Kelas 9B'),
   ];
-  late final Map<String, Kelas> _kelasLookup;
+  late final Map<String, KelasOption> _kelasLookup;
 
   @override
   void initState() {
@@ -572,7 +572,7 @@ class _FormGuruState extends State<FormGuru> {
     final dynamic kelasData = data?['kelas_diampu'];
     if (kelasData is Map<String, dynamic>) {
       final Map<String, dynamic> kelasDiampuMap = kelasData;
-      List<Kelas> initialKelas = [];
+      List<KelasOption> initialKelas = [];
       kelasDiampuMap.forEach((key, value) {
         if (value is List) {
           for (final dynamic kelasNama in value) {
@@ -752,9 +752,9 @@ class _FormGuruState extends State<FormGuru> {
             validator: (v) => v == null ? 'Role harus dipilih' : null,
           ),
           const SizedBox(height: 16),
-          MultiSelectChipField<Kelas?>(
+          MultiSelectChipField<KelasOption?>(
             items: _kelasOptions
-                .map((kelas) => MultiSelectItem<Kelas>(kelas, kelas.nama))
+                .map((kelas) => MultiSelectItem<KelasOption>(kelas, kelas.nama))
                 .toList(),
             initialValue: _selectedKelas,
             title: const Text("Kelas Diampu"),
@@ -769,7 +769,7 @@ class _FormGuruState extends State<FormGuru> {
               fontWeight: FontWeight.bold,
             ),
             onTap: (values) {
-              _selectedKelas = values.whereType<Kelas>().toList();
+              _selectedKelas = values.whereType<KelasOption>().toList();
             },
           ),
           const SizedBox(height: 24),
