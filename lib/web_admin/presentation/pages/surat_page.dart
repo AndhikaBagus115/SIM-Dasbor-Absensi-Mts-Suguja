@@ -14,6 +14,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:universal_html/html.dart' as html;
 import 'package:archive/archive.dart';
 
+import '../../core/theme.dart';
+
 const List<String> jenisSuratList = ['izin', 'sakit'];
 
 class DataSuratPage extends StatefulWidget {
@@ -71,7 +73,7 @@ class _DataSuratPageState extends State<DataSuratPage> {
 
   void _onSearchChanged() {
     _searchDebounce?.cancel();
-    _searchDebounce = Timer(const Duration(milliseconds: 350), () {
+    _searchDebounce = Timer(const Duration(milliseconds: 300), () {
       _applyClientSearchFilter(resetPage: true);
     });
   }
@@ -83,7 +85,8 @@ class _DataSuratPageState extends State<DataSuratPage> {
         ? List<Map<String, dynamic>>.from(_allSuratData)
         : _allSuratData.where((s) {
             final nama = (s['siswa']?['nama'] ?? '').toString().toLowerCase();
-            return nama.contains(keyword);
+            final nis = (s['siswa']?['nis'] ?? s['siswa_id'] ?? '').toString().toLowerCase();
+            return nama.contains(keyword) || nis.contains(keyword);
           }).toList();
 
     setState(() {
@@ -103,9 +106,14 @@ class _DataSuratPageState extends State<DataSuratPage> {
 
   void _showSnackbar(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        margin: const EdgeInsets.all(16),
+      ),
+    );
   }
 
   String? _extractObjectPathFromPublicUrl({
@@ -128,7 +136,7 @@ class _DataSuratPageState extends State<DataSuratPage> {
     setState(() => isLoading = true);
 
     try {
-      var query = supabase.from('surat').select('*, siswa(nama)');
+      var query = supabase.from('surat').select('*, siswa(nama, nis)');
 
       if (selectedStartDate != null) {
         query = query.gte(
@@ -149,23 +157,26 @@ class _DataSuratPageState extends State<DataSuratPage> {
       final response = await query.order('tanggal', ascending: false);
       final allData = List<Map<String, dynamic>>.from(response);
 
-      setState(() {
-        _allSuratData = allData;
-        _currentPage = 1;
-        isLoading = false;
-      });
-
-      _applyClientSearchFilter(resetPage: false);
+      if (mounted) {
+        setState(() {
+          _allSuratData = allData;
+          _currentPage = 1;
+          isLoading = false;
+        });
+        _applyClientSearchFilter(resetPage: false);
+      }
     } catch (e) {
-      setState(() => isLoading = false);
-      _showSnackbar('Gagal memuat data surat: $e');
+      if (mounted) {
+        setState(() => isLoading = false);
+        _showSnackbar('Gagal memuat data surat: $e');
+      }
     }
   }
 
   Future<List<Map<String, dynamic>>> _fetchAllSuratForGlobalAction() async {
     final res = await supabase
         .from('surat')
-        .select('id, siswa_id, tanggal, jenis, file_url, siswa(nama)')
+        .select('id, siswa_id, tanggal, jenis, file_url, siswa(nama, nis)')
         .order('tanggal', ascending: false);
     return List<Map<String, dynamic>>.from(res);
   }
@@ -240,7 +251,7 @@ class _DataSuratPageState extends State<DataSuratPage> {
         ..click();
 
       html.Url.revokeObjectUrl(url);
-      _showSnackbar('Backup berhasil: $zipName');
+      _showSnackbar('Backup berhasil diunduh: $zipName');
     } catch (e) {
       _showSnackbar('Backup gagal: $e');
     } finally {
@@ -277,6 +288,8 @@ class _DataSuratPageState extends State<DataSuratPage> {
     final confirmCtrl = TextEditingController();
     bool canDelete = false;
 
+    if (!mounted) return;
+
     await showDialog(
       context: context,
       barrierDismissible: false,
@@ -284,31 +297,56 @@ class _DataSuratPageState extends State<DataSuratPage> {
         return StatefulBuilder(
           builder: (ctx, setLocal) {
             return AlertDialog(
-              title: const Text('⚠️ HAPUS SEMUA DATA SURAT'),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              title: const Row(
+                children: [
+                  Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
+                  SizedBox(width: 10),
+                  Text(
+                    'Hapus Semua Data Surat',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                  ),
+                ],
+              ),
               content: SizedBox(
-                width: 520,
+                width: 480,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'Tindakan ini akan menghapus SEMUA data surat (DB) dan file di Storage.',
-                      style: TextStyle(fontWeight: FontWeight.bold),
+                      'Tindakan ini akan menghapus SEMUA data surat dari database dan file lampiran dari penyimpanan storage.',
+                      style: TextStyle(fontSize: 13.5, height: 1.4),
                     ),
-                    const SizedBox(height: 10),
-                    Text('• Total data: $total'),
-                    Text('• Dengan file: $withFile'),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 14),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade50,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('• Total data surat: $total'),
+                          const SizedBox(height: 4),
+                          Text('• File foto/dokumen: $withFile'),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
                     Text(
-                      'Hapus bersifat PERMANEN dan tidak bisa dikembalikan.',
-                      style: TextStyle(color: Colors.red.shade700),
+                      'Ketik "HAPUS SEMUA" untuk konfirmasi:',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                        color: Colors.grey.shade800,
+                      ),
                     ),
-                    const SizedBox(height: 12),
-                    const Text(
-                      'Ketik "HAPUS SEMUA" untuk melanjutkan:',
-                      style: TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 8),
                     TextField(
                       controller: confirmCtrl,
                       autofocus: true,
@@ -317,33 +355,49 @@ class _DataSuratPageState extends State<DataSuratPage> {
                           canDelete = v.trim().toUpperCase() == 'HAPUS SEMUA';
                         });
                       },
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
+                      decoration: InputDecoration(
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 12,
+                        ),
                         hintText: 'HAPUS SEMUA',
+                        hintStyle: TextStyle(color: Colors.grey.shade400),
                       ),
                     ),
                   ],
                 ),
               ),
+              actionsPadding: const EdgeInsets.all(16),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(ctx),
                   child: const Text('Batal'),
                 ),
                 OutlinedButton.icon(
-                  icon: const Icon(Icons.backup),
-                  label: const Text('Backup ZIP'),
+                  icon: const Icon(Icons.backup_rounded, size: 16),
+                  label: const Text('Backup Dulu'),
                   onPressed: () {
                     Navigator.pop(ctx);
                     _backupAllSuratToZipWeb();
                   },
                 ),
                 ElevatedButton.icon(
-                  icon: const Icon(Icons.delete_forever),
+                  icon: const Icon(Icons.delete_forever_rounded, size: 16),
                   label: const Text('Hapus Permanen'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.red,
                     foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
                   onPressed: canDelete
                       ? () {
@@ -369,7 +423,6 @@ class _DataSuratPageState extends State<DataSuratPage> {
 
     int deletedFiles = 0;
     int deletedRows = 0;
-    int failedFiles = 0;
 
     try {
       final paths = <String>[];
@@ -383,8 +436,6 @@ class _DataSuratPageState extends State<DataSuratPage> {
         );
         if (path != null) {
           paths.add(path);
-        } else {
-          failedFiles++;
         }
       }
 
@@ -402,7 +453,7 @@ class _DataSuratPageState extends State<DataSuratPage> {
       }
 
       _showSnackbar(
-        'Selesai. DB: $deletedRows baris, Storage: $deletedFiles file, gagal-path: $failedFiles',
+        'Selesai. Terhapus: $deletedRows data surat & $deletedFiles file storage.',
       );
       await fetchSurat();
     } catch (e) {
@@ -426,13 +477,11 @@ class _DataSuratPageState extends State<DataSuratPage> {
         lower.endsWith('.webp');
 
     if (isImage) {
-      _showSnackbar('Mengunduh dan mengkonversi gambar ke PDF...');
+      _showSnackbar('Mengunduh & mengonversi gambar ke PDF...');
       try {
         final response = await http.get(Uri.parse(fileUrl));
         if (response.statusCode != 200) {
-          _showSnackbar(
-            'Gagal mengambil gambar. Status: ${response.statusCode}',
-          );
+          _showSnackbar('Gagal mengambil gambar. Status: ${response.statusCode}');
           return;
         }
 
@@ -443,8 +492,9 @@ class _DataSuratPageState extends State<DataSuratPage> {
         pdf.addPage(
           pw.Page(
             pageFormat: PdfPageFormat.a4,
-            build: (_) =>
-                pw.Center(child: pw.Image(image, fit: pw.BoxFit.contain)),
+            build: (_) => pw.Center(
+              child: pw.Image(image, fit: pw.BoxFit.contain),
+            ),
           ),
         );
 
@@ -491,19 +541,36 @@ class _DataSuratPageState extends State<DataSuratPage> {
     _syncDateControllers();
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA),
+      backgroundColor: const Color(0xFFF8FAFC),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // 1. Header Banner
             _buildHeader(),
-            const SizedBox(height: 28),
-            _buildFilter(),
+
             const SizedBox(height: 20),
+
+            // 2. Filter & Action Card
+            _buildFilterCard(),
+
+            const SizedBox(height: 20),
+
+            // 3. Table Card
             isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _buildTable(),
+                ? Container(
+                    height: 300,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.grey.shade200),
+                    ),
+                    child: const Center(
+                      child: CircularProgressIndicator(),
+                    ),
+                  )
+                : _buildTableCard(),
           ],
         ),
       ),
@@ -512,64 +579,105 @@ class _DataSuratPageState extends State<DataSuratPage> {
 
   Widget _buildHeader() {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Colors.blue[700]!, Colors.blue[500]!],
+        gradient: const LinearGradient(
+          colors: [AppColors.primaryDark, AppColors.primary],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.blue.withValues(alpha: 0.3),
+            color: AppColors.primary.withValues(alpha: 0.25),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          const Expanded(
-            child: Text(
-              'Data Surat Siswa',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(
+              Icons.mail_outline_rounded,
+              color: Colors.white,
+              size: 28,
             ),
           ),
           const SizedBox(width: 16),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.school, color: Colors.white),
-              const SizedBox(width: 8),
-              Text(
-                widget.schoolName,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: Colors.white, fontSize: 16),
-              ),
-            ],
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Data Surat Siswa',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'Kelola dan arsipkan surat keterangan izin & sakit siswa',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    color: Colors.white70,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.school_outlined, color: Colors.white, size: 16),
+                const SizedBox(width: 8),
+                Text(
+                  widget.schoolName,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildFilter() {
+  Widget _buildFilterCard() {
+    final bool hasActiveFilter = selectedStartDate != null ||
+        selectedEndDate != null ||
+        selectedJenisSurat != null ||
+        searchController.text.isNotEmpty;
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade200),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withValues(alpha: 0.1),
-            blurRadius: 8,
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 10,
             offset: const Offset(0, 2),
           ),
         ],
@@ -577,154 +685,280 @@ class _DataSuratPageState extends State<DataSuratPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          // Baris 1: Judul Filter + Tombol Aksi Global (Backup & Hapus)
+          Row(
             children: [
-              Icon(Icons.filter_alt, color: Colors.blueAccent),
-              SizedBox(width: 8),
-              Text(
-                "Filter Data Surat",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.tune_rounded,
+                  color: AppColors.primary,
+                  size: 18,
+                ),
               ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 16,
-            runSpacing: 16,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              SizedBox(
-                width: 90,
-                child: DropdownButtonFormField<int>(
-                  initialValue: _rowsPerPage,
-                  decoration: InputDecoration(
-                    labelText: 'Show',
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 10),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  items: const [5, 10, 20, 50]
-                      .map(
-                        (val) =>
-                            DropdownMenuItem(value: val, child: Text('$val')),
-                      )
-                      .toList(),
-                  onChanged: (val) {
-                    if (val == null) return;
+              const SizedBox(width: 10),
+              const Text(
+                'Filter & Pencarian',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textDark,
+                ),
+              ),
+              if (hasActiveFilter) ...[
+                const SizedBox(width: 12),
+                TextButton.icon(
+                  onPressed: () {
                     setState(() {
-                      _rowsPerPage = val;
-                      _currentPage = 1;
+                      selectedStartDate = null;
+                      selectedEndDate = null;
+                      selectedJenisSurat = null;
+                      searchController.clear();
                     });
-                  },
-                ),
-              ),
-              SizedBox(
-                width: 220,
-                child: _buildDateFilter(
-                  label: 'Dari Tanggal',
-                  controller: _startDateCtrl,
-                  currentValue: selectedStartDate,
-                  onPicked: (date) {
-                    setState(() => selectedStartDate = date);
                     fetchSurat();
                   },
-                  onClear: () {
-                    setState(() => selectedStartDate = null);
-                    fetchSurat();
-                  },
-                ),
-              ),
-              SizedBox(
-                width: 220,
-                child: _buildDateFilter(
-                  label: 'Sampai Tanggal',
-                  controller: _endDateCtrl,
-                  currentValue: selectedEndDate,
-                  onPicked: (date) {
-                    setState(() => selectedEndDate = date);
-                    fetchSurat();
-                  },
-                  onClear: () {
-                    setState(() => selectedEndDate = null);
-                    fetchSurat();
-                  },
-                ),
-              ),
-              SizedBox(
-                width: 220,
-                child: DropdownButtonFormField<String?>(
-                  initialValue: selectedJenisSurat,
-                  items: [
-                    const DropdownMenuItem<String?>(
-                      value: null,
-                      child: Text("Semua Jenis"),
-                    ),
-                    ...jenisSuratList.map(
-                      (jenis) => DropdownMenuItem<String?>(
-                        value: jenis,
-                        child: Text(jenis),
-                      ),
-                    ),
-                  ],
-                  onChanged: (value) {
-                    setState(() => selectedJenisSurat = value);
-                    fetchSurat();
-                  },
-                  decoration: InputDecoration(
-                    labelText: 'Jenis Surat',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 10,
-                    ),
-                  ),
-                ),
-              ),
-              SizedBox(
-                width: 385,
-                child: TextField(
-                  controller: searchController,
-                  decoration: InputDecoration(
-                    labelText: 'Cari Nama Siswa',
-                    prefixIcon: const Icon(Icons.search),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 10,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const Divider(height: 32),
-          Align(
-            alignment: Alignment.centerRight,
-            child: Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: [
-                ElevatedButton.icon(
-                  onPressed: isLoading ? null : _backupAllSuratToZipWeb,
-                  icon: const Icon(Icons.backup),
-                  label: const Text('Backup ZIP'),
-                ),
-                OutlinedButton.icon(
-                  onPressed: isLoading ? null : _confirmDeleteAllGlobal,
-                  icon: const Icon(Icons.delete_forever),
-                  label: const Text('Hapus Semua'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.red,
-                    side: const BorderSide(color: Colors.red),
+                  icon: const Icon(Icons.refresh_rounded, size: 15),
+                  label: const Text('Reset Filter', style: TextStyle(fontSize: 12)),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.grey.shade600,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   ),
                 ),
               ],
-            ),
+              const Spacer(),
+              // Action buttons
+              Wrap(
+                spacing: 10,
+                runSpacing: 8,
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: isLoading ? null : _backupAllSuratToZipWeb,
+                    icon: const Icon(Icons.cloud_download_outlined, size: 16),
+                    label: const Text('Backup ZIP'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF6366F1),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 11,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      textStyle: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: isLoading ? null : _confirmDeleteAllGlobal,
+                    icon: const Icon(Icons.delete_outline_rounded, size: 16),
+                    label: const Text('Hapus Semua'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.red.shade600,
+                      side: BorderSide(color: Colors.red.shade200),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 11,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      textStyle: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 16),
+            child: Divider(height: 1, thickness: 1),
+          ),
+
+          // Baris 2: Input Filter
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isNarrow = constraints.maxWidth < 800;
+
+              return Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  // Cari Nama / NIS Siswa
+                  SizedBox(
+                    width: isNarrow ? constraints.maxWidth : 280,
+                    child: TextField(
+                      controller: searchController,
+                      style: const TextStyle(fontSize: 13.5),
+                      decoration: InputDecoration(
+                        hintText: 'Cari nama atau NIS siswa...',
+                        hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13),
+                        prefixIcon: const Icon(Icons.search_rounded, size: 18, color: Colors.grey),
+                        suffixIcon: searchController.text.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear, size: 16),
+                                onPressed: () {
+                                  searchController.clear();
+                                  _applyClientSearchFilter(resetPage: true);
+                                },
+                              )
+                            : null,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        filled: true,
+                        fillColor: Colors.grey.shade50,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide(color: Colors.grey.shade200),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // Filter Jenis Surat
+                  SizedBox(
+                    width: isNarrow ? (constraints.maxWidth - 12) / 2 : 170,
+                    child: DropdownButtonFormField<String?>(
+                      initialValue: selectedJenisSurat,
+                      style: const TextStyle(fontSize: 13, color: AppColors.textDark),
+                      items: [
+                        const DropdownMenuItem<String?>(
+                          value: null,
+                          child: Text("Semua Jenis"),
+                        ),
+                        ...jenisSuratList.map(
+                          (jenis) => DropdownMenuItem<String?>(
+                            value: jenis,
+                            child: Text(jenis[0].toUpperCase() + jenis.substring(1)),
+                          ),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        setState(() => selectedJenisSurat = value);
+                        fetchSurat();
+                      },
+                      decoration: InputDecoration(
+                        labelText: 'Jenis Surat',
+                        labelStyle: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                        filled: true,
+                        fillColor: Colors.grey.shade50,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide(color: Colors.grey.shade200),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // Dari Tanggal
+                  SizedBox(
+                    width: isNarrow ? (constraints.maxWidth - 12) / 2 : 180,
+                    child: _buildDateFilter(
+                      label: 'Dari Tanggal',
+                      controller: _startDateCtrl,
+                      currentValue: selectedStartDate,
+                      onPicked: (date) {
+                        setState(() => selectedStartDate = date);
+                        fetchSurat();
+                      },
+                      onClear: () {
+                        setState(() => selectedStartDate = null);
+                        fetchSurat();
+                      },
+                    ),
+                  ),
+
+                  // Sampai Tanggal
+                  SizedBox(
+                    width: isNarrow ? (constraints.maxWidth - 12) / 2 : 180,
+                    child: _buildDateFilter(
+                      label: 'Sampai Tanggal',
+                      controller: _endDateCtrl,
+                      currentValue: selectedEndDate,
+                      onPicked: (date) {
+                        setState(() => selectedEndDate = date);
+                        fetchSurat();
+                      },
+                      onClear: () {
+                        setState(() => selectedEndDate = null);
+                        fetchSurat();
+                      },
+                    ),
+                  ),
+
+                  // Tampilkan (Rows Per Page)
+                  SizedBox(
+                    width: isNarrow ? (constraints.maxWidth - 12) / 2 : 110,
+                    child: DropdownButtonFormField<int>(
+                      initialValue: _rowsPerPage,
+                      style: const TextStyle(fontSize: 13, color: AppColors.textDark),
+                      decoration: InputDecoration(
+                        labelText: 'Baris',
+                        labelStyle: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                        filled: true,
+                        fillColor: Colors.grey.shade50,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide(color: Colors.grey.shade200),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+                        ),
+                      ),
+                      items: const [5, 10, 20, 50]
+                          .map(
+                            (val) => DropdownMenuItem(
+                              value: val,
+                              child: Text('$val'),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (val) {
+                        if (val == null) return;
+                        setState(() {
+                          _rowsPerPage = val;
+                          _currentPage = 1;
+                        });
+                      },
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
         ],
       ),
@@ -741,36 +975,98 @@ class _DataSuratPageState extends State<DataSuratPage> {
     return TextFormField(
       readOnly: true,
       controller: controller,
+      style: const TextStyle(fontSize: 13),
       onTap: () async {
         final pickedDate = await showDatePicker(
           context: context,
           initialDate: currentValue ?? DateTime.now(),
           firstDate: DateTime(2000),
           lastDate: DateTime(2050),
+          builder: (ctx, child) {
+            return Theme(
+              data: Theme.of(ctx).copyWith(
+                colorScheme: const ColorScheme.light(
+                  primary: AppColors.primary,
+                  onPrimary: Colors.white,
+                  surface: Colors.white,
+                  onSurface: AppColors.textDark,
+                ),
+              ),
+              child: child!,
+            );
+          },
         );
         if (pickedDate != null) onPicked(pickedDate);
       },
       decoration: InputDecoration(
         labelText: label,
-        suffixIcon: IconButton(
-          icon: Icon(currentValue == null ? Icons.calendar_today : Icons.clear),
-          onPressed: currentValue == null ? null : onClear,
+        labelStyle: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+        filled: true,
+        fillColor: Colors.grey.shade50,
+        prefixIcon: const Icon(Icons.calendar_today_outlined, size: 16, color: Colors.grey),
+        suffixIcon: currentValue != null
+            ? IconButton(
+                icon: const Icon(Icons.clear, size: 16),
+                onPressed: onClear,
+              )
+            : null,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: Colors.grey.shade300),
         ),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 12,
-          vertical: 10,
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: Colors.grey.shade200),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
         ),
       ),
     );
   }
 
-  Widget _buildTable() {
+  Widget _buildTableCard() {
     if (suratData.isEmpty) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(20),
-          child: Text('Tidak ada data surat ditemukan dengan filter saat ini.'),
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 60, horizontal: 24),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey.shade200),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.mark_email_unread_outlined,
+                size: 48,
+                color: Colors.grey.shade400,
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Tidak Ada Data Surat',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textDark,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Tidak ada surat yang sesuai dengan filter atau kata kunci saat ini.',
+              style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
+            ),
+          ],
         ),
       );
     }
@@ -787,22 +1083,23 @@ class _DataSuratPageState extends State<DataSuratPage> {
 
     final currentData = suratData.sublist(startIndex, endIndex);
 
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.grey.withValues(alpha: 0.08),
-                blurRadius: 10,
-                offset: const Offset(0, 2),
-              ),
-            ],
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
           ),
-          child: LayoutBuilder(
+        ],
+      ),
+      child: Column(
+        children: [
+          // Table layout
+          LayoutBuilder(
             builder: (context, constraints) {
               double minTableWidth = constraints.maxWidth;
               if (!minTableWidth.isFinite) minTableWidth = 0.0;
@@ -813,46 +1110,78 @@ class _DataSuratPageState extends State<DataSuratPage> {
                   constraints: BoxConstraints(minWidth: minTableWidth),
                   child: DataTable(
                     columnSpacing: 24,
-                    headingRowHeight: 56,
-                    dataRowHeight: 64,
+                    horizontalMargin: 20,
+                    headingRowHeight: 50,
+                    dataRowMinHeight: 58,
+                    dataRowMaxHeight: 58,
                     headingRowColor: WidgetStateProperty.all(
-                      Colors.blue.shade50,
+                      const Color(0xFFF8FAFC),
                     ),
                     columns: const [
                       DataColumn(
                         label: Text(
-                          'No',
-                          style: TextStyle(fontWeight: FontWeight.bold),
+                          'NO',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.6,
+                            color: Color(0xFF64748B),
+                          ),
                         ),
                       ),
                       DataColumn(
                         label: Text(
-                          'ID Siswa',
-                          style: TextStyle(fontWeight: FontWeight.bold),
+                          'NIS',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.6,
+                            color: Color(0xFF64748B),
+                          ),
                         ),
                       ),
                       DataColumn(
                         label: Text(
-                          'Nama Siswa',
-                          style: TextStyle(fontWeight: FontWeight.bold),
+                          'NAMA SISWA',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.6,
+                            color: Color(0xFF64748B),
+                          ),
                         ),
                       ),
                       DataColumn(
                         label: Text(
-                          'Tanggal',
-                          style: TextStyle(fontWeight: FontWeight.bold),
+                          'TANGGAL SURAT',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.6,
+                            color: Color(0xFF64748B),
+                          ),
                         ),
                       ),
                       DataColumn(
                         label: Text(
-                          'Jenis Surat',
-                          style: TextStyle(fontWeight: FontWeight.bold),
+                          'JENIS SURAT',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.6,
+                            color: Color(0xFF64748B),
+                          ),
                         ),
                       ),
                       DataColumn(
                         label: Text(
-                          'Aksi',
-                          style: TextStyle(fontWeight: FontWeight.bold),
+                          'AKSI',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.6,
+                            color: Color(0xFF64748B),
+                          ),
                         ),
                       ),
                     ],
@@ -865,20 +1194,112 @@ class _DataSuratPageState extends State<DataSuratPage> {
                               DateTime.parse(rawTanggal.toString()).toLocal(),
                             );
                       final int rowNumber = startIndex + i + 1;
+                      final String jenis = (s['jenis'] ?? '').toString().toLowerCase();
+                      final String displayNis = (s['siswa']?['nis'] ?? s['siswa_id'] ?? '-').toString();
 
                       return DataRow(
                         cells: [
-                          DataCell(Text('$rowNumber')),
-                          DataCell(Text('${s['siswa_id'] ?? '-'}')),
-                          DataCell(Text('${s['siswa']?['nama'] ?? '-'}')),
-                          DataCell(Text(tanggal)),
-                          DataCell(Text('${s['jenis'] ?? '-'}')),
                           DataCell(
-                            _buildAction(
-                              Icons.visibility,
-                              'Lihat',
-                              Colors.green,
-                              () => _showDetailDialog(s),
+                            Text(
+                              '$rowNumber',
+                              style: TextStyle(
+                                color: Colors.grey.shade600,
+                                fontWeight: FontWeight.w500,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                          DataCell(
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.grey.shade100,
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: Colors.grey.shade300),
+                              ),
+                              child: Text(
+                                displayNis,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  fontFamily: 'monospace',
+                                  color: Color(0xFF475569),
+                                ),
+                              ),
+                            ),
+                          ),
+                          DataCell(
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                CircleAvatar(
+                                  radius: 14,
+                                  backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                                  child: Text(
+                                    ((s['siswa']?['nama'] ?? 'S').toString().isNotEmpty)
+                                        ? (s['siswa']?['nama'] ?? 'S').toString()[0].toUpperCase()
+                                        : 'S',
+                                    style: const TextStyle(
+                                      color: AppColors.primary,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Text(
+                                  '${s['siswa']?['nama'] ?? '-'}',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 13.5,
+                                    color: AppColors.textDark,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          DataCell(
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.calendar_month_outlined,
+                                  size: 15,
+                                  color: Colors.grey.shade400,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  tanggal,
+                                  style: const TextStyle(fontSize: 13),
+                                ),
+                              ],
+                            ),
+                          ),
+                          DataCell(_buildJenisBadge(jenis)),
+                          DataCell(
+                            ElevatedButton.icon(
+                              onPressed: () => _showDetailDialog(s),
+                              icon: const Icon(Icons.visibility_rounded, size: 15),
+                              label: const Text('Lihat'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF10B981).withValues(alpha: 0.12),
+                                foregroundColor: const Color(0xFF047857),
+                                elevation: 0,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                textStyle: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                             ),
                           ),
                         ],
@@ -889,59 +1310,127 @@ class _DataSuratPageState extends State<DataSuratPage> {
               );
             },
           ),
-        ),
-        const SizedBox(height: 20),
-        _buildPaginationControls(),
-        const SizedBox(height: 50),
-      ],
+
+          const Divider(height: 1, thickness: 1),
+
+          // Pagination Footer
+          _buildPaginationFooter(),
+        ],
+      ),
     );
   }
 
-  Widget _buildPaginationControls() {
+  Widget _buildJenisBadge(String jenis) {
+    Color bg;
+    Color border;
+    Color text;
+    IconData icon;
+    String label;
+
+    if (jenis == 'sakit') {
+      bg = const Color(0xFFFEF3C7);
+      border = const Color(0xFFFDE68A);
+      text = const Color(0xFFB45309);
+      icon = Icons.healing_rounded;
+      label = 'Sakit';
+    } else if (jenis == 'izin') {
+      bg = const Color(0xFFE0F2FE);
+      border = const Color(0xFFBAE6FD);
+      text = const Color(0xFF0369A1);
+      icon = Icons.assignment_outlined;
+      label = 'Izin';
+    } else {
+      bg = Colors.grey.shade100;
+      border = Colors.grey.shade300;
+      text = Colors.grey.shade700;
+      icon = Icons.description_outlined;
+      label = jenis.isNotEmpty ? jenis : '-';
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: border),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: text),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: text,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPaginationFooter() {
     if (suratData.isEmpty) return const SizedBox.shrink();
 
     final int totalPages = (suratData.length / _rowsPerPage).ceil();
     final int startItem = ((_currentPage - 1) * _rowsPerPage) + 1;
     final int endItem = min(_currentPage * _rowsPerPage, suratData.length);
 
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.end,
-      children: [
-        Text(
-          "$startItem - $endItem dari ${suratData.length}",
-          style: const TextStyle(
-            color: Colors.grey,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(width: 16),
-        IconButton(
-          icon: const Icon(Icons.chevron_left),
-          onPressed: _currentPage > 1
-              ? () => setState(() => _currentPage--)
-              : null,
-        ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          decoration: BoxDecoration(
-            color: Colors.blue,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Text(
-            "$_currentPage",
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      child: Row(
+        children: [
+          Text(
+            "Menampilkan $startItem - $endItem dari ${suratData.length} data surat",
+            style: TextStyle(
+              color: Colors.grey.shade600,
+              fontSize: 12.5,
+              fontWeight: FontWeight.w500,
             ),
           ),
-        ),
-        IconButton(
-          icon: const Icon(Icons.chevron_right),
-          onPressed: _currentPage < totalPages
-              ? () => setState(() => _currentPage++)
-              : null,
-        ),
-      ],
+          const Spacer(),
+          // Prev button
+          IconButton(
+            icon: const Icon(Icons.chevron_left_rounded, size: 20),
+            color: AppColors.primary,
+            disabledColor: Colors.grey.shade300,
+            onPressed: _currentPage > 1
+                ? () => setState(() => _currentPage--)
+                : null,
+            tooltip: 'Halaman Sebelumnya',
+          ),
+          const SizedBox(width: 4),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: AppColors.primary,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              "$_currentPage / $totalPages",
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+              ),
+            ),
+          ),
+          const SizedBox(width: 4),
+          // Next button
+          IconButton(
+            icon: const Icon(Icons.chevron_right_rounded, size: 20),
+            color: AppColors.primary,
+            disabledColor: Colors.grey.shade300,
+            onPressed: _currentPage < totalPages
+                ? () => setState(() => _currentPage++)
+                : null,
+            tooltip: 'Halaman Berikutnya',
+          ),
+        ],
+      ),
     );
   }
 
@@ -955,72 +1444,139 @@ class _DataSuratPageState extends State<DataSuratPage> {
 
     final String fileUrl = (surat['file_url'] ?? '').toString();
     final bool hasFile = fileUrl.isNotEmpty;
+    final String jenis = (surat['jenis'] ?? '').toString().toLowerCase();
+    final String displayNis = (surat['siswa']?['nis'] ?? surat['siswa_id'] ?? '-').toString();
 
     showDialog(
       context: context,
       builder: (context) {
         final size = MediaQuery.of(context).size;
-
-        final double maxW = min(size.width * 0.9, 1400);
-        final double maxH = min(size.height * 0.75, 760);
+        final double maxW = min(size.width * 0.85, 720);
+        final double maxH = min(size.height * 0.8, 640);
 
         return AlertDialog(
-          title: const Text('Detail Surat'),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.description_outlined,
+                  color: AppColors.primary,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Detail Surat Keterangan',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textDark,
+                  ),
+                ),
+              ),
+              _buildJenisBadge(jenis),
+            ],
+          ),
           content: SizedBox(
             width: maxW,
             child: SingleChildScrollView(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildDetailRow('ID Surat:', '${surat['id'] ?? '-'}'),
-                  _buildDetailRow('ID Siswa:', '${surat['siswa_id'] ?? '-'}'),
-                  _buildDetailRow(
-                    'Nama Siswa:',
-                    '${surat['siswa']?['nama'] ?? '-'}',
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey.shade200),
+                    ),
+                    child: Column(
+                      children: [
+                        _buildDetailRow('ID Surat', '#${surat['id'] ?? '-'}'),
+                        const SizedBox(height: 6),
+                        _buildDetailRow('NIS Siswa', displayNis),
+                        const SizedBox(height: 6),
+                        _buildDetailRow('Nama Siswa', '${surat['siswa']?['nama'] ?? '-'}'),
+                        const SizedBox(height: 6),
+                        _buildDetailRow('Tanggal Surat', tanggal),
+                      ],
+                    ),
                   ),
-                  _buildDetailRow('Tanggal:', tanggal),
-                  _buildDetailRow('Jenis Surat:', '${surat['jenis'] ?? '-'}'),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 18),
                   const Text(
-                    'Preview Surat',
-                    style: TextStyle(fontWeight: FontWeight.bold),
+                    'Lampiran Foto / Dokumen',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      color: AppColors.textDark,
+                    ),
                   ),
                   const SizedBox(height: 10),
                   if (!hasFile)
                     Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.all(14),
+                      padding: const EdgeInsets.all(24),
                       decoration: BoxDecoration(
-                        color: Colors.grey.shade100,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: Colors.grey.shade300),
+                        color: Colors.grey.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey.shade200),
                       ),
-                      child: const Text('Tidak ada foto surat.'),
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.hide_image_outlined,
+                            size: 40,
+                            color: Colors.grey.shade400,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Tidak ada foto/lampiran surat.',
+                            style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
+                          ),
+                        ],
+                      ),
                     )
                   else
                     Center(
                       child: ConstrainedBox(
                         constraints: BoxConstraints(
                           maxWidth: maxW,
-                          maxHeight: maxH,
+                          maxHeight: maxH * 0.65,
                         ),
                         child: ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
-                          child: Image.network(
-                            fileUrl,
-                            fit: BoxFit.contain,
-                            loadingBuilder: (c, child, progress) {
-                              if (progress == null) return child;
-                              return const Padding(
-                                padding: EdgeInsets.all(16),
-                                child: CircularProgressIndicator(),
-                              );
-                            },
-                            errorBuilder: (c, e, s) => Container(
-                              alignment: Alignment.center,
-                              padding: const EdgeInsets.all(16),
-                              color: Colors.grey.shade100,
-                              child: const Text('Gagal memuat foto surat'),
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              border: Border.all(color: Colors.grey.shade300),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Image.network(
+                              fileUrl,
+                              fit: BoxFit.contain,
+                              loadingBuilder: (c, child, progress) {
+                                if (progress == null) return child;
+                                return const Padding(
+                                  padding: EdgeInsets.all(40),
+                                  child: Center(
+                                    child: CircularProgressIndicator(),
+                                  ),
+                                );
+                              },
+                              errorBuilder: (c, e, s) => Container(
+                                alignment: Alignment.center,
+                                padding: const EdgeInsets.all(24),
+                                color: Colors.grey.shade50,
+                                child: const Text('Gagal memuat foto surat'),
+                              ),
                             ),
                           ),
                         ),
@@ -1031,7 +1587,7 @@ class _DataSuratPageState extends State<DataSuratPage> {
             ),
           ),
           actionsPadding: const EdgeInsets.symmetric(
-            horizontal: 24,
+            horizontal: 20,
             vertical: 16,
           ),
           actions: [
@@ -1040,28 +1596,38 @@ class _DataSuratPageState extends State<DataSuratPage> {
                 Expanded(
                   child: OutlinedButton(
                     onPressed: () => Navigator.of(context).pop(),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
                     child: const Text('Tutup'),
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: hasFile
-                        ? () {
-                            Navigator.of(context).pop();
-                            final filename = 'surat_${surat['id'] ?? 'file'}';
-                            _handleDownload(fileUrl, filename);
-                          }
-                        : null,
-                    icon: const Icon(Icons.download),
-                    label: const Text('Download'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
+                if (hasFile) ...[
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        final filename = 'surat_${surat['id'] ?? 'file'}';
+                        _handleDownload(fileUrl, filename);
+                      },
+                      icon: const Icon(Icons.download_rounded, size: 18),
+                      label: const Text('Download File'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                ],
               ],
             ),
           ],
@@ -1071,44 +1637,32 @@ class _DataSuratPageState extends State<DataSuratPage> {
   }
 
   Widget _buildDetailRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 110,
-            child: Text(
-              label,
-              style: const TextStyle(fontWeight: FontWeight.bold),
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 120,
+          child: Text(
+            label,
+            style: TextStyle(
+              fontWeight: FontWeight.w500,
+              fontSize: 13,
+              color: Colors.grey.shade600,
             ),
           ),
-          Expanded(child: Text(value)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAction(
-    IconData icon,
-    String label,
-    Color color,
-    VoidCallback onPressed,
-  ) {
-    return ElevatedButton.icon(
-      style: ElevatedButton.styleFrom(
-        backgroundColor: color.withValues(alpha: 0.1),
-        foregroundColor: color,
-        elevation: 0,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      ),
-      icon: Icon(icon, size: 16),
-      label: Text(
-        label,
-        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-      ),
-      onPressed: onPressed,
+        ),
+        const Text(': ', style: TextStyle(color: Colors.grey)),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+              color: AppColors.textDark,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
