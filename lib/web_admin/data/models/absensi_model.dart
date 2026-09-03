@@ -7,6 +7,9 @@ class Absensi {
   final DateTime tanggal;
   final AttendanceStatus status;
   final String? keterangan;
+  final String? waktuMasuk;
+  final String? waktuPulang;
+  final String? updatedBy;
   final DateTime createdAt;
   final DateTime? updatedAt;
 
@@ -16,6 +19,9 @@ class Absensi {
     required this.tanggal,
     required this.status,
     this.keterangan,
+    this.waktuMasuk,
+    this.waktuPulang,
+    this.updatedBy,
     required this.createdAt,
     this.updatedAt,
   });
@@ -32,6 +38,9 @@ class Absensi {
         json[AbsensiColumns.status] as String? ?? 'hadir',
       ),
       keterangan: json[AbsensiColumns.keterangan] as String?,
+      waktuMasuk: json[AbsensiColumns.waktuMasuk] as String?,
+      waktuPulang: json[AbsensiColumns.waktuPulang] as String?,
+      updatedBy: json[AbsensiColumns.updatedBy] as String?,
       createdAt: json[AbsensiColumns.createdAt] != null
           ? DateTime.parse(json[AbsensiColumns.createdAt] as String)
           : DateTime.now(),
@@ -48,6 +57,9 @@ class Absensi {
     AbsensiColumns.tanggal: tanggal.toIso8601String(),
     AbsensiColumns.status: status.value,
     AbsensiColumns.keterangan: keterangan,
+    AbsensiColumns.waktuMasuk: waktuMasuk,
+    AbsensiColumns.waktuPulang: waktuPulang,
+    AbsensiColumns.updatedBy: updatedBy,
     AbsensiColumns.createdAt: createdAt.toIso8601String(),
     AbsensiColumns.updatedAt: updatedAt?.toIso8601String(),
   };
@@ -59,6 +71,9 @@ class Absensi {
     DateTime? tanggal,
     AttendanceStatus? status,
     String? keterangan,
+    String? waktuMasuk,
+    String? waktuPulang,
+    String? updatedBy,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -68,6 +83,9 @@ class Absensi {
       tanggal: tanggal ?? this.tanggal,
       status: status ?? this.status,
       keterangan: keterangan ?? this.keterangan,
+      waktuMasuk: waktuMasuk ?? this.waktuMasuk,
+      waktuPulang: waktuPulang ?? this.waktuPulang,
+      updatedBy: updatedBy ?? this.updatedBy,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

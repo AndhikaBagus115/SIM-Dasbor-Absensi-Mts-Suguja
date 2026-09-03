@@ -186,6 +186,9 @@ abstract class AbsensiColumns {
   static const String tanggal = 'tanggal';
   static const String status = 'status';
   static const String keterangan = 'keterangan';
+  static const String waktuMasuk = 'waktu_masuk';
+  static const String waktuPulang = 'waktu_pulang';
+  static const String updatedBy = 'updated_by';
   static const String createdAt = 'created_at';
   static const String updatedAt = 'updated_at';
 }
