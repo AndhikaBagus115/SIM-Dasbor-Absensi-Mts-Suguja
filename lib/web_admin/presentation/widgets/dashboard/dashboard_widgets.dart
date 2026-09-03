@@ -579,7 +579,7 @@ class _StatistikKehadiranChartState extends State<StatistikKehadiranChart> {
         _bottomTitles = titles;
         _minX = 0;
         _maxX = (i - 1).clamp(0, double.infinity);
-        _maxY = (maxVal == 0) ? 10 : (maxVal * 1.2).ceilToDouble();
+        _maxY = (maxVal == 0) ? 5 : (maxVal <= 5 ? 5 : (maxVal * 1.25).ceilToDouble());
         _intervalX = (i > 10) ? (i / 10).floorToDouble().clamp(1, 999) : 1;
         _isLoading = false;
       });
@@ -641,7 +641,7 @@ class _StatistikKehadiranChartState extends State<StatistikKehadiranChart> {
         gridData: FlGridData(
           show: true,
           drawVerticalLine: false,
-          horizontalInterval: _maxY > 0 ? _maxY / 5 : 5,
+          horizontalInterval: _maxY > 5 ? (_maxY / 5).ceilToDouble() : 1,
           getDrawingHorizontalLine: (v) => FlLine(color: Colors.grey.shade200, strokeWidth: 1),
         ),
         titlesData: FlTitlesData(
@@ -662,7 +662,7 @@ class _StatistikKehadiranChartState extends State<StatistikKehadiranChart> {
           leftTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
-              interval: _maxY > 0 ? _maxY / 5 : 5,
+              interval: _maxY > 5 ? (_maxY / 5).ceilToDouble() : 1,
               reservedSize: 36,
               getTitlesWidget: (v, _) => Text(
                 _getLeftTitle(v),
