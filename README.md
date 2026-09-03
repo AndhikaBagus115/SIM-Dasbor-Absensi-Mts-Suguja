@@ -1,20 +1,19 @@
-# 💻 MTs School Admin Dashboard & Multichannel Notification Gateway (Flutter Web & Desktop)
+# 💻 MTs School Admin Dashboard & Notification Portal (Flutter Web & Desktop)
 
 ![Flutter](https://img.shields.io/badge/Flutter-3.x-02569B?style=for-the-badge&logo=flutter&logoColor=white)
 ![Dart](https://img.shields.io/badge/Dart-3.x-0175C2?style=for-the-badge&logo=dart&logoColor=white)
 ![Backend](https://img.shields.io/badge/Backend-Supabase-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)
-![WhatsApp](https://img.shields.io/badge/Gateway-WAHA%20(WhatsApp)-25D366?style=for-the-badge&logo=whatsapp&logoColor=white)
 ![OneSignal](https://img.shields.io/badge/Push-OneSignal%20REST-E51B24?style=for-the-badge&logo=onesignal&logoColor=white)
 ![Tests](https://img.shields.io/badge/Tests-Passed-brightgreen?style=for-the-badge&logo=flutter)
 ![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
 
-> **Web & Desktop Admin Dashboard Portal** berbasis **Flutter** dan **Supabase** untuk Sistem Informasi Manajemen Sekolah MTs. Dilengkapi dengan **Sistem Notifikasi Multikanal (WhatsApp Gateway WAHA & OneSignal Push Notification)**, pembuat **Kartu Presensi Siswa berbasis QR Code & Cetak PDF**, manajemen status kelulusan siswa, caching performa tinggi (*Stale-While-Revalidate*), verifikasi surat izin digital, serta ekspor laporan multi-format (Excel, CSV, & PDF).
+> **Web & Desktop Admin Dashboard Portal** berbasis **Flutter** dan **Supabase** untuk Sistem Informasi Manajemen Sekolah MTs. Dilengkapi dengan **Sistem Notifikasi Mobile (OneSignal Push Notification REST API)**, pembuat **Kartu Presensi Siswa berbasis QR Code & Cetak PDF**, manajemen status kelulusan siswa, caching performa tinggi (*Stale-While-Revalidate*), verifikasi surat izin digital, serta ekspor laporan multi-format (Excel, CSV, & PDF).
 
 ---
 
 ## 📌 Tentang Aplikasi
 
-Aplikasi ini bertindak sebagai pusat kendali administrasi sekolah (*Admin Central Hub*) yang mengintegrasikan pengelolaan master data siswa, guru, rombel kelas, rekapitulasi presensi harian secara *real-time*, hingga komunikasi langsung dengan orang tua/wali murid melalui kanal otomatis **WhatsApp** dan **Push Notification Mobile**.
+Aplikasi ini bertindak sebagai pusat kendali administrasi sekolah (*Admin Central Hub*) yang mengintegrasikan pengelolaan master data siswa, guru, rombel kelas, rekapitulasi presensi harian secara *real-time*, hingga komunikasi langsung dengan orang tua/wali murid melalui kanal **Push Notification Mobile**.
 
 Dirancang menggunakan prinsip **Clean & Modular Architecture** dengan pemisahan *Core Services*, *Models*, *Repositories*, *Logic/Controllers*, dan *Presentation Layer*, aplikasi ini mendukung pengoperasian penuh di antarmuka **Web Browser** maupun **Desktop (Windows/macOS/Linux)**.
 
@@ -29,10 +28,9 @@ Aplikasi ini terhubung langsung dengan ekosistem aplikasi mobile: **Mobile App G
 * **Grafik Visualisasi Presensi (`fl_chart`)**: Grafik tren kehadiran interaktif dengan kalkulasi dinamis batas sumbu Y dan interval otomatis.
 * **Aktivitas & Log Cepat**: Pemantauan aktivitas presensi terbaru dan status operasional sistem.
 
-### 🔔 2. Sistem Notifikasi Multikanal (WhatsApp & OneSignal Push)
-* **WAHA WhatsApp Gateway**: Pengiriman pesan notifikasi otomatis ke nomor WhatsApp orang tua/wali murid untuk pemberitahuan presensi, ketidakhadiran, maupun surat izin.
+### 🔔 2. Sistem Push Notification & Broadcast Pengumuman (OneSignal)
 * **OneSignal Push Notification**: Integrasi REST API OneSignal untuk menyiarkan pengumuman langsung ke perangkat *smartphone* wali murid dan guru.
-* **Pusat Simulasi & Diagnostik Gateway**: Halaman pengujian notifikasi langsung dengan kartu diagnostik status server WAHA, template pesan presensi, serta riwayat broadcast pengumuman.
+* **Pusat Simulasi & Pengujian Notifikasi**: Halaman simulasi notifikasi presensi, template pesan kehadiran, serta riwayat siaran (*broadcast*) pengumuman.
 * **Segmentasi Pengiriman**: Mendukung broadcast ke *Semua Wali Murid*, *Per Rombel Kelas*, maupun *Per Siswa*.
 
 ### ⚡ 3. Master Data Caching (Stale-While-Revalidate)
@@ -78,7 +76,6 @@ Aplikasi ini terhubung langsung dengan ekosistem aplikasi mobile: **Mobile App G
 | **Framework Utama** | [Flutter 3.x](https://flutter.dev/) | Mendukung target Web & Desktop |
 | **Bahasa Pemrograman** | [Dart 3.x](https://dart.dev/) | Null safety & Modern OOP |
 | **Backend & Database** | Supabase Flutter (`supabase_flutter`) | PostgreSQL, Auth, Storage, Realtime |
-| **WhatsApp Gateway** | WAHA (WhatsApp HTTP API) | Integrasi gateway WhatsApp REST API |
 | **Push Notification** | OneSignal REST API | Notifikasi broadcast ke mobile app |
 | **State Management** | Provider Pattern (`provider`) | Arsitektur state terpusat & teruji |
 | **Visualisasi Data** | `fl_chart` | Grafik statistik presensi interaktif |
@@ -105,7 +102,7 @@ lib/
     │   │   ├── error_handler_service.dart  # Centralized Error Handling & Dialogs
     │   │   ├── logging_service.dart        # Logger & Logging Utilities
     │   │   ├── master_data_cache_service.dart # SWR Caching untuk Kelas, Guru, Siswa
-    │   │   ├── notification_service.dart   # Service Multikanal (WAHA & OneSignal)
+    │   │   ├── notification_service.dart   # Service Notifikasi & Broadcast
     │   │   └── onesignal_service.dart      # REST Client OneSignal Push Notification
     │   └── utils/
     │       └── debouncer.dart              # Search Input Debouncer Utility
@@ -136,7 +133,7 @@ lib/
         │   ├── dashboard_page.dart         # Statistik & Grafik Dashboard
         │   ├── guru_page.dart              # Manajemen Guru
         │   ├── kelas_page.dart             # Manajemen Rombel Kelas
-        │   ├── notifikasi_test_page.dart   # Gateway Test & Pengumuman Multikanal
+        │   ├── notifikasi_test_page.dart   # Pengujian Notifikasi & Broadcast
         │   ├── password_recovery_screen.dart # Form Pemulihan Kata Sandi
         │   ├── profil_admin_page.dart      # Manajemen Profil Admin
         │   ├── siswa_page.dart             # Manajemen Siswa & QR Code Generator
@@ -145,7 +142,7 @@ lib/
             ├── dashboard/
             │   └── dashboard_widgets.dart  # Stat Cards, Chart Components
             └── notifikasi/
-                ├── gateway_diagnostics_card.dart # Diagnostik Status WAHA Gateway
+                ├── gateway_diagnostics_card.dart # Diagnostik Status Server Gateway
                 ├── notifikasi_dialogs.dart       # Dialog Pratinjau Template & Target Badge
                 ├── pengumuman_form_card.dart     # Form Broadcast Pengumuman
                 ├── presensi_simulation_card.dart # Simulasi Alert Presensi
@@ -177,11 +174,6 @@ Sesuaikan konfigurasi pada file `.env`:
 # Supabase Configuration
 SUPABASE_URL=https://your-project-url.supabase.co
 SUPABASE_ANON_KEY=your-anon-key-here
-
-# WAHA WhatsApp Gateway Configuration
-WAHA_BASE_URL=http://your-waha-server:3000
-WAHA_API_KEY=your-waha-api-key-here
-WAHA_SESSION=default
 
 # OneSignal Push Notification Configuration
 ONESIGNAL_APP_ID=your-onesignal-app-id-here
@@ -229,7 +221,6 @@ Rangkaian pengujian mencakup:
 
 Proyek ini dirancang untuk beroperasi secara berdampingan dengan:
 * **Mobile App Guru & Orang Tua**: Aplikasi mobile Flutter untuk pencatatan presensi dengan pemindaian QR code dan pengajuan surat izin oleh orang tua.
-* **WAHA (WhatsApp HTTP API)**: Server gateway WhatsApp lokal / cloud untuk pengiriman pesan otomatis.
 * **OneSignal Service**: Layanan push notification untuk notifikasi real-time di aplikasi mobile.
 
 ---
