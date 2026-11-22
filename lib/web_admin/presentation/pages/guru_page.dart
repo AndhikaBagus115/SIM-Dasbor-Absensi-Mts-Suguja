@@ -4,6 +4,8 @@ import 'package:multi_select_flutter/multi_select_flutter.dart';
 import 'dart:typed_data';
 import 'package:image_picker/image_picker.dart';
 import '../../core/constants.dart';
+import '../../data/repositories/report_repository.dart';
+import '../widgets/report_export_button.dart';
 import '../../core/services/master_data_cache_service.dart';
 
 // --- MODEL KELAS OPTION (Untuk MultiSelect) ---
@@ -23,7 +25,9 @@ class KelasOption {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is KelasOption && runtimeType == other.runtimeType && id == other.id;
+      other is KelasOption &&
+          runtimeType == other.runtimeType &&
+          id == other.id;
 
   @override
   int get hashCode => id.hashCode;
@@ -52,8 +56,9 @@ class _PageGuruState extends State<PageGuru> {
   Future<void> fetchGuru({bool forceRefresh = false}) async {
     if (mounted) setState(() => isLoading = true);
     try {
-      final response = await MasterDataCacheService.instance
-          .getGuruList(forceRefresh: forceRefresh);
+      final response = await MasterDataCacheService.instance.getGuruList(
+        forceRefresh: forceRefresh,
+      );
       if (mounted) {
         setState(() {
           guruData = List<Map<String, dynamic>>.from(response);
@@ -289,22 +294,30 @@ class _PageGuruState extends State<PageGuru> {
   Widget _buildAddButton() {
     return Align(
       alignment: Alignment.centerRight,
-      child: ElevatedButton.icon(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: const Color.fromARGB(255, 11, 226, 43),
-          foregroundColor: Colors.white,
-          elevation: 2,
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
+      child: Wrap(
+        alignment: WrapAlignment.end,
+        spacing: 12,
+        runSpacing: 12,
+        children: [
+          ReportExportButton(load: () => ReportRepository(supabase).guru()),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color.fromARGB(255, 11, 226, 43),
+              foregroundColor: Colors.white,
+              elevation: 2,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            icon: const Icon(Icons.person_add),
+            label: const Text(
+              'Tambah Data Guru',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            onPressed: () => _showFormDialog(),
           ),
-        ),
-        icon: const Icon(Icons.person_add),
-        label: const Text(
-          'Tambah Data Guru',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        onPressed: () => _showFormDialog(),
+        ],
       ),
     );
   }
@@ -353,9 +366,7 @@ class _PageGuruState extends State<PageGuru> {
                   headingRowHeight: 56,
                   dataRowMinHeight: 80,
                   dataRowMaxHeight: 80,
-                  headingRowColor: WidgetStateProperty.all(
-                    Colors.blue.shade50,
-                  ),
+                  headingRowColor: WidgetStateProperty.all(Colors.blue.shade50),
                   columns: const [
                     DataColumn(
                       label: Text(

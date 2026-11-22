@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../logic/absensi_controller.dart';
+import '../widgets/report_export_button.dart';
 
 class PageAbsensi extends StatelessWidget {
   final String schoolName;
@@ -385,22 +386,33 @@ class _AbsensiContent extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        ElevatedButton.icon(
-          icon: const Icon(Icons.picture_as_pdf, size: 18),
-          label: Text(
-            controller.isRekapMode
-                ? 'Export Laporan Bulanan'
-                : 'Export Laporan Harian',
-          ),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color.fromARGB(255, 209, 33, 33),
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+        Wrap(
+          alignment: WrapAlignment.end,
+          spacing: 12,
+          runSpacing: 12,
+          children: [
+            ReportExportButton(load: controller.buildReport),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.picture_as_pdf, size: 18),
+              label: Text(
+                controller.isRekapMode
+                    ? 'Export Laporan Bulanan'
+                    : 'Export Laporan Harian',
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color.fromARGB(255, 209, 33, 33),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              onPressed: () => controller.exportPdf(context),
             ),
-          ),
-          onPressed: () => controller.exportPdf(context),
+          ],
         ),
         const SizedBox(height: 16),
         controller.isRekapMode
