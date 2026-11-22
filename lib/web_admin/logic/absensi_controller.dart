@@ -7,6 +7,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/services/master_data_cache_service.dart';
 import '../data/repositories/absensi_repository.dart';
 import '../data/repositories/kelas_repository.dart';
+import '../data/repositories/report_repository.dart';
+import '../core/services/report_export_service.dart';
 
 class AbsensiController extends ChangeNotifier {
   final SupabaseClient supabase;
@@ -42,12 +44,20 @@ class AbsensiController extends ChangeNotifier {
     SupabaseClient? client,
     AbsensiRepository? absensiRepo,
     KelasRepository? kelasRepo,
-  })  : supabase = client ?? Supabase.instance.client,
-        absensiRepository = absensiRepo ?? AbsensiRepositoryImpl(client ?? Supabase.instance.client),
-        kelasRepository = kelasRepo ?? KelasRepositoryImpl(client ?? Supabase.instance.client) {
+  }) : supabase = client ?? Supabase.instance.client,
+       absensiRepository =
+           absensiRepo ??
+           AbsensiRepositoryImpl(client ?? Supabase.instance.client),
+       kelasRepository =
+           kelasRepo ??
+           KelasRepositoryImpl(client ?? Supabase.instance.client) {
     fetchKelas();
     fetchData();
   }
+
+  Future<TabularReport> buildReport() => ReportRepository(
+    supabase,
+  ).absensi(selectedDate, kelasId: selectedKelasId, monthly: isRekapMode);
 
   // --- ACTIONS ---
 
@@ -73,8 +83,9 @@ class AbsensiController extends ChangeNotifier {
     isKelasLoading = true;
     notifyListeners();
     try {
-      final response = await MasterDataCacheService.instance
-          .getKelasList(forceRefresh: forceRefresh);
+      final response = await MasterDataCacheService.instance.getKelasList(
+        forceRefresh: forceRefresh,
+      );
       daftarKelas = List<Map<String, dynamic>>.from(response);
     } catch (e) {
       debugPrint("Error Fetch Kelas: $e");
@@ -339,7 +350,10 @@ class AbsensiController extends ChangeNotifier {
       'Status',
       'Ket',
     ];
-    final tableData = absensiData.asMap().entries.map((entry) {
+    final allRows = await ReportRepository(
+      supabase,
+    ).dailyRows(selectedDate, kelasId: selectedKelasId);
+    final tableData = allRows.asMap().entries.map((entry) {
       final i = entry.key + 1;
       final d = entry.value;
       final siswa = d['siswa'] ?? {};

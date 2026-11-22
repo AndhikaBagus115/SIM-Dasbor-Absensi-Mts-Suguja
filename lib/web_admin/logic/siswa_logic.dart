@@ -10,6 +10,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:universal_html/html.dart' as html; // Khusus Web Download
 import '../core/services/master_data_cache_service.dart';
 import '../data/repositories/siswa_repository.dart';
+import '../data/repositories/report_repository.dart';
+import '../core/services/report_export_service.dart';
 import '../data/repositories/kelas_repository.dart';
 
 class DataSiswaLogic with ChangeNotifier {
@@ -26,6 +28,12 @@ class DataSiswaLogic with ChangeNotifier {
            siswaRepo ?? SiswaRepositoryImpl(client ?? Supabase.instance.client),
        kelasRepository =
            kelasRepo ?? KelasRepositoryImpl(client ?? Supabase.instance.client);
+
+  Future<TabularReport> buildReport() => ReportRepository(supabase).siswa(
+    kelasId: _selectedKelasId,
+    status: _selectedStatus,
+    search: _lastSearchQuery,
+  );
 
   // --- State ---
   bool _isLoading = true;

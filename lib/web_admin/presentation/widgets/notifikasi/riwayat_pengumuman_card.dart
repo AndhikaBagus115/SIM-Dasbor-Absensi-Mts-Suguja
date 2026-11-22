@@ -74,7 +74,7 @@ class RiwayatPengumumanCard extends StatelessWidget {
                       Row(
                         children: [
                           const Text(
-                            'Riwayat Pengumuman Terkirim',
+                            'Riwayat Pengumuman Tersimpan',
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
@@ -83,10 +83,13 @@ class RiwayatPengumumanCard extends StatelessWidget {
                           const SizedBox(width: 8),
                           Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 2),
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF0D9488)
-                                  .withValues(alpha: 0.12),
+                              color: const Color(
+                                0xFF0D9488,
+                              ).withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Text(
@@ -126,26 +129,35 @@ class RiwayatPengumumanCard extends StatelessWidget {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.warning_amber_rounded,
-                        color: Color(0xFFD97706), size: 20),
+                    const Icon(
+                      Icons.warning_amber_rounded,
+                      color: Color(0xFFD97706),
+                      size: 20,
+                    ),
                     const SizedBox(width: 10),
                     const Expanded(
                       child: Text(
                         'Tabel `pengumuman` belum dibuat di Supabase. Klik tombol di kanan untuk melihat skrip SQL pembuatan tabel.',
-                        style:
-                            TextStyle(fontSize: 12, color: Color(0xFF92400E)),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF92400E),
+                        ),
                       ),
                     ),
                     const SizedBox(width: 8),
                     ElevatedButton.icon(
                       icon: const Icon(Icons.code, size: 14),
-                      label: const Text('Lihat SQL',
-                          style: TextStyle(fontSize: 12)),
+                      label: const Text(
+                        'Lihat SQL',
+                        style: TextStyle(fontSize: 12),
+                      ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFFD97706),
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 6),
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
                       ),
                       onPressed: onShowSqlDialog,
                     ),
@@ -171,7 +183,9 @@ class RiwayatPengumumanCard extends StatelessWidget {
                 filled: true,
                 fillColor: const Color(0xFFF8FAFC),
                 contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 14, vertical: 10),
+                  horizontal: 14,
+                  vertical: 10,
+                ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
                   borderSide: BorderSide(color: Colors.grey.shade300),
@@ -203,15 +217,20 @@ class RiwayatPengumumanCard extends StatelessWidget {
                 ),
                 child: Column(
                   children: [
-                    Icon(Icons.inbox_outlined,
-                        size: 40, color: Colors.grey.shade400),
+                    Icon(
+                      Icons.inbox_outlined,
+                      size: 40,
+                      color: Colors.grey.shade400,
+                    ),
                     const SizedBox(height: 8),
                     Text(
                       searchQuery.isEmpty
                           ? 'Belum ada riwayat pengumuman'
                           : 'Tidak ada pengumuman yang cocok dengan "$searchQuery"',
                       style: TextStyle(
-                          color: Colors.grey.shade600, fontSize: 13),
+                        color: Colors.grey.shade600,
+                        fontSize: 13,
+                      ),
                     ),
                   ],
                 ),
@@ -227,7 +246,9 @@ class RiwayatPengumumanCard extends StatelessWidget {
                     // Table Header
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 11),
+                        horizontal: 16,
+                        vertical: 11,
+                      ),
                       decoration: const BoxDecoration(
                         color: Color(0xFFF1F5F9),
                         borderRadius: BorderRadius.only(
@@ -242,9 +263,10 @@ class RiwayatPengumumanCard extends StatelessWidget {
                             child: Text(
                               'No',
                               style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13,
-                                  color: Color(0xFF334155)),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                                color: Color(0xFF334155),
+                              ),
                             ),
                           ),
                           SizedBox(width: 12),
@@ -253,9 +275,10 @@ class RiwayatPengumumanCard extends StatelessWidget {
                             child: Text(
                               'Waktu Kirim',
                               style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13,
-                                  color: Color(0xFF334155)),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                                color: Color(0xFF334155),
+                              ),
                             ),
                           ),
                           SizedBox(width: 12),
@@ -264,9 +287,10 @@ class RiwayatPengumumanCard extends StatelessWidget {
                             child: Text(
                               'Judul Pengumuman',
                               style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13,
-                                  color: Color(0xFF334155)),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                                color: Color(0xFF334155),
+                              ),
                             ),
                           ),
                           SizedBox(width: 12),
@@ -275,9 +299,10 @@ class RiwayatPengumumanCard extends StatelessWidget {
                             child: Text(
                               'Isi Pengumuman',
                               style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13,
-                                  color: Color(0xFF334155)),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                                color: Color(0xFF334155),
+                              ),
                             ),
                           ),
                           SizedBox(width: 12),
@@ -286,9 +311,10 @@ class RiwayatPengumumanCard extends StatelessWidget {
                             child: Text(
                               'Target Pengiriman',
                               style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13,
-                                  color: Color(0xFF334155)),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                                color: Color(0xFF334155),
+                              ),
                             ),
                           ),
                           SizedBox(width: 12),
@@ -297,9 +323,10 @@ class RiwayatPengumumanCard extends StatelessWidget {
                             child: Text(
                               'Dibuat Oleh',
                               style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13,
-                                  color: Color(0xFF334155)),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                                color: Color(0xFF334155),
+                              ),
                             ),
                           ),
                           SizedBox(width: 12),
@@ -309,9 +336,10 @@ class RiwayatPengumumanCard extends StatelessWidget {
                               child: Text(
                                 'Aksi',
                                 style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 13,
-                                    color: Color(0xFF334155)),
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                  color: Color(0xFF334155),
+                                ),
                               ),
                             ),
                           ),
@@ -322,12 +350,16 @@ class RiwayatPengumumanCard extends StatelessWidget {
                     // Table Body Rows
                     ...List.generate(filteredList.length, (index) {
                       final item = filteredList[index];
-                      final dateStr = DateFormat('dd MMM yyyy, HH:mm', 'id_ID')
-                          .format(item.createdAt);
+                      final dateStr = DateFormat(
+                        'dd MMM yyyy, HH:mm',
+                        'id_ID',
+                      ).format(item.createdAt);
 
                       return Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 12),
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
                         decoration: BoxDecoration(
                           color: index % 2 == 0
                               ? Colors.white
@@ -349,8 +381,9 @@ class RiwayatPengumumanCard extends StatelessWidget {
                               child: Text(
                                 '${index + 1}',
                                 style: const TextStyle(
-                                    fontSize: 12.5,
-                                    color: Color(0xFF64748B)),
+                                  fontSize: 12.5,
+                                  color: Color(0xFF64748B),
+                                ),
                               ),
                             ),
                             const SizedBox(width: 12),
@@ -359,7 +392,9 @@ class RiwayatPengumumanCard extends StatelessWidget {
                               child: Text(
                                 dateStr,
                                 style: const TextStyle(
-                                    fontSize: 12, color: Color(0xFF475569)),
+                                  fontSize: 12,
+                                  color: Color(0xFF475569),
+                                ),
                               ),
                             ),
                             const SizedBox(width: 12),
@@ -384,9 +419,10 @@ class RiwayatPengumumanCard extends StatelessWidget {
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
-                                    fontSize: 12,
-                                    color: Color(0xFF475569),
-                                    height: 1.3),
+                                  fontSize: 12,
+                                  color: Color(0xFF475569),
+                                  height: 1.3,
+                                ),
                               ),
                             ),
                             const SizedBox(width: 12),
@@ -407,26 +443,32 @@ class RiwayatPengumumanCard extends StatelessWidget {
                                 alignment: Alignment.centerLeft,
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(
-                                      horizontal: 8, vertical: 3),
+                                    horizontal: 8,
+                                    vertical: 3,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: const Color(0xFFF1F5F9),
                                     borderRadius: BorderRadius.circular(6),
                                     border: Border.all(
-                                        color: const Color(0xFFCBD5E1)),
+                                      color: const Color(0xFFCBD5E1),
+                                    ),
                                   ),
                                   child: const Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Icon(Icons.shield_outlined,
-                                          size: 11,
-                                          color: Color(0xFF475569)),
+                                      Icon(
+                                        Icons.shield_outlined,
+                                        size: 11,
+                                        color: Color(0xFF475569),
+                                      ),
                                       SizedBox(width: 4),
                                       Text(
                                         'Admin Web',
                                         style: TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w500,
-                                            color: Color(0xFF334155)),
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w500,
+                                          color: Color(0xFF334155),
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -441,24 +483,30 @@ class RiwayatPengumumanCard extends StatelessWidget {
                                 children: [
                                   IconButton(
                                     icon: const Icon(
-                                        Icons.visibility_outlined,
-                                        size: 18,
-                                        color: Color(0xFF4F46E5)),
+                                      Icons.visibility_outlined,
+                                      size: 18,
+                                      color: Color(0xFF4F46E5),
+                                    ),
                                     tooltip: 'Lihat Isi Lengkap',
                                     padding: EdgeInsets.zero,
                                     constraints: const BoxConstraints(
-                                        minWidth: 32, minHeight: 32),
+                                      minWidth: 32,
+                                      minHeight: 32,
+                                    ),
                                     onPressed: () => onShowDetail(item),
                                   ),
                                   IconButton(
                                     icon: const Icon(
-                                        Icons.delete_outline_rounded,
-                                        size: 18,
-                                        color: Color(0xFFDC2626)),
+                                      Icons.delete_outline_rounded,
+                                      size: 18,
+                                      color: Color(0xFFDC2626),
+                                    ),
                                     tooltip: 'Hapus Pengumuman',
                                     padding: EdgeInsets.zero,
                                     constraints: const BoxConstraints(
-                                        minWidth: 32, minHeight: 32),
+                                      minWidth: 32,
+                                      minHeight: 32,
+                                    ),
                                     onPressed: () => onDelete(item),
                                   ),
                                 ],

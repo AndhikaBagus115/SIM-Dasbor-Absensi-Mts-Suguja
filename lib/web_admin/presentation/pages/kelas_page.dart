@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../logic/kelas_logic.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../data/repositories/report_repository.dart';
+import '../widgets/report_export_button.dart';
 
 class PageKelas extends StatefulWidget {
   final String schoolName;
@@ -107,21 +110,32 @@ class _PageKelasState extends State<PageKelas> {
             Container(
               alignment: Alignment.centerRight,
               margin: const EdgeInsets.only(bottom: 20),
-              child: ElevatedButton.icon(
-                icon: const Icon(Icons.add, size: 18),
-                label: const Text('Tambah Kelas'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue[700],
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+              child: Wrap(
+                alignment: WrapAlignment.end,
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  ReportExportButton(
+                    load: () =>
+                        ReportRepository(Supabase.instance.client).kelas(),
                   ),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 16,
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('Tambah Kelas'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue[700],
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 16,
+                      ),
+                    ),
+                    onPressed: _showAddDialog,
                   ),
-                ),
-                onPressed: _showAddDialog,
+                ],
               ),
             ),
 
@@ -247,9 +261,7 @@ class _KelasDataTable extends StatelessWidget {
                   headingRowHeight: 50,
                   dataRowMinHeight: 60,
                   dataRowMaxHeight: 60,
-                  headingRowColor: WidgetStateProperty.all(
-                    Colors.blue.shade50,
-                  ),
+                  headingRowColor: WidgetStateProperty.all(Colors.blue.shade50),
                   columns: const [
                     DataColumn(
                       label: SizedBox(
@@ -595,7 +607,10 @@ class _UpsertKelasDialogState extends State<_UpsertKelasDialog> {
               ? const SizedBox(
                   width: 20,
                   height: 20,
-                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 2,
+                  ),
                 )
               : const Text('Simpan'),
         ),

@@ -200,6 +200,47 @@ flutter pub get
 
 ---
 
+## Aktivasi verifikasi surat dan koreksi presensi
+
+Fitur persetujuan surat dan koreksi presensi memerlukan migration
+[`202611220001_attendance_workflows.sql`](supabase/migrations/202611220001_attendance_workflows.sql).
+Jalankan isi file tersebut melalui Supabase SQL Editor sebagai pengelola database sebelum memakai aksi baru.
+Migration ini disiapkan dan diuji lokal; penerapannya ke Supabase produksi dilakukan terpisah.
+
+Hak admin ditentukan dari `guru.id = auth.uid()` dan `guru.role = 'admin'`.
+Pastikan akun admin mempunyai baris guru tersebut dan policy yang ada melindungi perubahan `guru.role`.
+Endpoint baru memeriksa hak ini di server; identitas pengubah tidak diterima dari input klien.
+
+Migration menambahkan:
+
+- `review_surat`: memproses surat `menunggu` menjadi `disetujui` atau `ditolak`. Penolakan memerlukan alasan.
+  Persetujuan mengisi status `izin`/`sakit` untuk seluruh rentang `tanggal` sampai `tanggal_selesai`.
+  Presensi `hadir`, `terlambat`, atau `pulang` tidak ditimpa; admin harus meninjaunya dahulu.
+  Pengulangan keputusan yang sama tidak membuat catatan audit ganda.
+- `correct_absensi`: menyimpan koreksi, identitas admin, dan audit sebelum/sesudah dalam satu transaksi.
+  Data yang telah berubah sejak dialog dibuka ditolak agar koreksi orang lain tidak tertimpa.
+- `attendance_status_options`: mengambil pilihan status dari enum database yang sebenarnya, termasuk
+  jika database memakai ejaan `alpa` alih-alih `alfa`.
+- `absensi_audit`: riwayat yang dapat dibaca admin; klien tidak diberi hak menulis atau menghapus audit.
+  Dialog menampilkan 100 perubahan terbaru untuk record yang dipilih.
+- `surat.reviewed_by` dan `surat.reviewed_at`: identitas dan waktu verifikasi.
+
+Trigger notifikasi yang dikirim bersama schema proyek dibatasi ke tanggal hari ini menurut Asia/Jakarta.
+Handler dan argumen webhook tetap dipertahankan. Ini mencegah approval rentang tanggal mengirim notifikasi
+presensi lampau/mendatang saat itu juga. Jika instalasi sudah memiliki kondisi `WHEN` khusus, migration
+mempertahankannya untuk ditinjau pengelola. Dashboard semester menghitung data sampai hari ini.
+
+## Ekspor laporan
+
+Menu **Ekspor** pada halaman Siswa, Guru, Kelas, dan Presensi menyediakan Excel (`.xlsx`) dan CSV.
+Ekspor siswa mengikuti kelas, status, dan pencarian; presensi mengikuti tanggal/bulan dan kelas.
+Seluruh halaman data diambil hingga jumlah record terpenuhi. Laporan PDF harian juga mengambil seluruh
+data sesuai filter, bukan hanya halaman tabel yang sedang terbuka.
+
+NIS dan nomor telepon disimpan sebagai teks dalam XLSX. CSV memakai UTF-8 dengan BOM dan menetralkan
+input yang bisa dibaca sebagai formula spreadsheet. Browser mengunduh file; desktop menyediakan dialog
+penyimpanan. Pembatalan dialog tidak dilaporkan sebagai keberhasilan ekspor.
+
 ## 🧪 Pengujian (Testing)
 
 Proyek ini dilengkapi dengan unit test dan widget test untuk memastikan integritas logika data, caching, dan komponen antarmuka.
@@ -214,6 +255,22 @@ Rangkaian pengujian mencakup:
 * `test/unit/models_test.dart`: Validasi serialisasi/deserialisasi JSON model data.
 * `test/unit/notification_enums_test.dart`: Validasi enum kanal & tipe notifikasi.
 * `test/widget/notifikasi_dialogs_test.dart`: Pengujian widget badge target notifikasi dan info card.
+* `test/unit/pengumuman_controller_test.dart`: Race pemilihan kelas, pembaruan penerima saat kirim, kegagalan penyimpanan, dan pengiriman parsial.
+* `test/unit/onesignal_result_test.dart`: Respons tanpa ID pesan dan target yang hanya sebagian diterima.
+* `test/unit/report_export_test.dart`: CSV/XLSX, formula spreadsheet, filter, dan pagination ekspor.
+* `test/widget/attendance_workflow_widgets_test.dart`: Validasi persetujuan/penolakan dan koreksi presensi.
+* `test/widget/pengumuman_form_test.dart`: Tombol kirim menunggu penerima yang siap dan tidak kosong.
+
+Transaksi dan otorisasi SQL dapat diuji pada PostgreSQL tertanam dengan fixture lokal, tanpa akses Supabase:
+
+```bash
+npm install --prefix .dart_tool/sql_checks --no-save --no-package-lock --ignore-scripts --no-audit --no-fund @electric-sql/pglite@0.5.17
+node tools/test_attendance_workflows.mjs
+```
+
+Dependency pengujian SQL disimpan di `.dart_tool` yang diabaikan Git. Pengujian mencakup rollback,
+audit, konflik koreksi, keputusan idempotent, rentang surat, notifikasi tanggal mendatang, enum aktual,
+serta penolakan akses guru dan anonim. Fixture webhook tidak melakukan request jaringan.
 
 ---
 

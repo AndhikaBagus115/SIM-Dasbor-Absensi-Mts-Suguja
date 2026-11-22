@@ -2,6 +2,7 @@ import 'package:barcode_widget/barcode_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:screenshot/screenshot.dart';
 import '../../logic/siswa_logic.dart';
+import '../widgets/report_export_button.dart';
 
 class DataSiswaPage extends StatefulWidget {
   final String schoolName;
@@ -39,7 +40,9 @@ class _DataSiswaPageState extends State<DataSiswaPage> {
     super.didUpdateWidget(oldWidget);
     if (widget.initialKelasId != oldWidget.initialKelasId) {
       _logic.onKelasSelected(
-        widget.initialKelasId != null ? int.tryParse(widget.initialKelasId!) : null,
+        widget.initialKelasId != null
+            ? int.tryParse(widget.initialKelasId!)
+            : null,
         searchController.text,
       );
     }
@@ -234,7 +237,9 @@ class _DataSiswaPageState extends State<DataSiswaPage> {
                                 ? 'Data berhasil diperbarui'
                                 : 'Data siswa berhasil ditambahkan'),
                       ),
-                      backgroundColor: error == null ? Colors.green : Colors.red,
+                      backgroundColor: error == null
+                          ? Colors.green
+                          : Colors.red,
                     ),
                   );
                 }
@@ -531,9 +536,12 @@ class _DataSiswaPageState extends State<DataSiswaPage> {
             _buildHeader(),
             const SizedBox(height: 16),
 
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
+            Wrap(
+              alignment: WrapAlignment.end,
+              spacing: 12,
+              runSpacing: 12,
               children: [
+                ReportExportButton(load: _logic.buildReport),
                 ElevatedButton.icon(
                   onPressed: () => _showSiswaForm(),
                   icon: const Icon(Icons.add),
@@ -550,7 +558,6 @@ class _DataSiswaPageState extends State<DataSiswaPage> {
                     ),
                   ),
                 ),
-                const SizedBox(width: 16),
                 ElevatedButton.icon(
                   onPressed: () => _logic.importExcel(context),
                   icon: const Icon(Icons.file_upload),
@@ -565,7 +572,6 @@ class _DataSiswaPageState extends State<DataSiswaPage> {
                     ),
                   ),
                 ),
-                const SizedBox(width: 16),
                 ElevatedButton.icon(
                   onPressed: () => _showDialogKenaikanKelas(),
                   icon: const Icon(Icons.drive_file_move),
@@ -582,7 +588,6 @@ class _DataSiswaPageState extends State<DataSiswaPage> {
                     ),
                   ),
                 ),
-                const SizedBox(width: 16),
                 ElevatedButton.icon(
                   onPressed: _logic.selectedKelasId == null
                       ? null
@@ -967,8 +972,12 @@ class _DataSiswaPageState extends State<DataSiswaPage> {
                                   color: isAktif
                                       ? Colors.green.withValues(alpha: 0.1)
                                       : (s['status'] == 'lulus'
-                                            ? Colors.purple.withValues(alpha: 0.1)
-                                            : Colors.red.withValues(alpha: 0.1)),
+                                            ? Colors.purple.withValues(
+                                                alpha: 0.1,
+                                              )
+                                            : Colors.red.withValues(
+                                                alpha: 0.1,
+                                              )),
                                   borderRadius: BorderRadius.circular(4),
                                   border: Border.all(
                                     color: isAktif
