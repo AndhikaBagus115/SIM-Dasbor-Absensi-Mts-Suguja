@@ -26,6 +26,12 @@ abstract class SiswaRepository {
   /// Delete a student
   Future<void> deleteSiswa(int id);
 
+  /// Update active students in a class for promotion or graduation.
+  Future<void> updateActiveSiswaByKelas(int kelasId, Map<String, dynamic> data);
+
+  /// Import students by NIS, including students moving between classes.
+  Future<void> upsertSiswa(List<Map<String, dynamic>> data);
+
   /// Get total count of students
   Future<int> getSiswaCount({String? kelasId});
 
@@ -36,8 +42,10 @@ abstract class SiswaRepository {
 /// Implementation of SiswaRepository using Supabase
 class SiswaRepositoryImpl implements SiswaRepository {
   final SupabaseClient _supabase;
+  final MasterDataCacheService _cache;
 
-  SiswaRepositoryImpl(this._supabase);
+  SiswaRepositoryImpl(this._supabase, {MasterDataCacheService? cache})
+    : _cache = cache ?? MasterDataCacheService.instance;
 
   @override
   Future<List<Siswa>> getAllSiswa({
@@ -50,8 +58,11 @@ class SiswaRepositoryImpl implements SiswaRepository {
       // Direct approach: create query and execute in one statement
       // to avoid type inference issues with query builder
       dynamic response;
-      
-      if (kelasId != null && kelasId.isNotEmpty && searchQuery != null && searchQuery.isNotEmpty) {
+
+      if (kelasId != null &&
+          kelasId.isNotEmpty &&
+          searchQuery != null &&
+          searchQuery.isNotEmpty) {
         response = await _supabase
             .from(DbTables.siswa)
             .select()
@@ -133,13 +144,10 @@ class SiswaRepositoryImpl implements SiswaRepository {
     try {
       _validateSiswaData(data);
 
-      final response = await _supabase
-          .from(DbTables.siswa)
-          .insert(data)
-          .select()
-          .single();
+      final response = await _write(
+        () => _supabase.from(DbTables.siswa).insert(data).select().single(),
+      );
 
-      MasterDataCacheService.instance.invalidateSiswa(kelasId: int.tryParse(data[SiswaColumns.kelasId]?.toString() ?? ''));
       return Siswa.fromJson(response);
     } on PostgrestException catch (e) {
       throw RepositoryException(
@@ -161,14 +169,15 @@ class SiswaRepositoryImpl implements SiswaRepository {
     try {
       _validateSiswaData(data, isUpdate: true);
 
-      final response = await _supabase
-          .from(DbTables.siswa)
-          .update(data)
-          .filter(SiswaColumns.id, 'eq', id)
-          .select()
-          .single();
+      final response = await _write(
+        () => _supabase
+            .from(DbTables.siswa)
+            .update(data)
+            .filter(SiswaColumns.id, 'eq', id)
+            .select()
+            .single(),
+      );
 
-      MasterDataCacheService.instance.invalidateSiswa(kelasId: int.tryParse(data[SiswaColumns.kelasId]?.toString() ?? ''));
       return Siswa.fromJson(response);
     } on PostgrestException catch (e) {
       throw RepositoryException(
@@ -188,11 +197,12 @@ class SiswaRepositoryImpl implements SiswaRepository {
   @override
   Future<void> deleteSiswa(int id) async {
     try {
-      await _supabase
-          .from(DbTables.siswa)
-          .delete()
-          .filter(SiswaColumns.id, 'eq', id);
-      MasterDataCacheService.instance.invalidateSiswa();
+      await _write(
+        () => _supabase
+            .from(DbTables.siswa)
+            .delete()
+            .filter(SiswaColumns.id, 'eq', id),
+      );
     } on PostgrestException catch (e) {
       throw RepositoryException(
         message: 'Failed to delete student: ${e.message}',
@@ -206,6 +216,42 @@ class SiswaRepositoryImpl implements SiswaRepository {
         stackTrace: stackTrace,
       );
     }
+  }
+
+  @override
+  Future<void> updateActiveSiswaByKelas(
+    int kelasId,
+    Map<String, dynamic> data,
+  ) async {
+    _validateSiswaData(data, isUpdate: true);
+    await _write(
+      () => _supabase
+          .from(DbTables.siswa)
+          .update(data)
+          .eq(SiswaColumns.kelasId, kelasId)
+          .eq(SiswaColumns.status, StudentStatus.aktif.value),
+    );
+  }
+
+  @override
+  Future<void> upsertSiswa(List<Map<String, dynamic>> data) async {
+    if (data.isEmpty) return;
+    for (final row in data) {
+      _validateSiswaData(row);
+    }
+    await _write(
+      () => _supabase
+          .from(DbTables.siswa)
+          .upsert(data, onConflict: SiswaColumns.nis),
+    );
+  }
+
+  /// Clear every class after a successful write to cover old/new membership and
+  /// NIS imports without an extra query for the student's previous class.
+  Future<T> _write<T>(Future<T> Function() mutation) async {
+    final result = await mutation();
+    _cache.invalidateSiswa();
+    return result;
   }
 
   @override
@@ -231,9 +277,11 @@ class SiswaRepositoryImpl implements SiswaRepository {
           .from(DbTables.siswa)
           .stream(primaryKey: [SiswaColumns.id])
           .order(SiswaColumns.nama)
-          .map((response) => (response as List)
-              .map((json) => Siswa.fromJson(json as Map<String, dynamic>))
-              .toList());
+          .map(
+            (response) => (response as List)
+                .map((json) => Siswa.fromJson(json as Map<String, dynamic>))
+                .toList(),
+          );
     } catch (e) {
       return Stream.error(
         RepositoryException(

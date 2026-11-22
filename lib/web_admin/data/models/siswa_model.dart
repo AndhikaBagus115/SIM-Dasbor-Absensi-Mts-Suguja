@@ -35,7 +35,7 @@ class Siswa {
       status: StudentStatus.fromValue(
         json[SiswaColumns.status] as String? ?? 'aktif',
       ),
-      kelasId: json[SiswaColumns.kelasId] as String?,
+      kelasId: json[SiswaColumns.kelasId]?.toString(),
       email: json[SiswaColumns.email] as String?,
       noHp: json[SiswaColumns.noHp] as String?,
       alamat: json[SiswaColumns.alamat] as String?,
@@ -90,7 +90,8 @@ class Siswa {
   }
 
   @override
-  String toString() => 'Siswa(id: $id, nis: $nis, nama: $nama, status: ${status.value})';
+  String toString() =>
+      'Siswa(id: $id, nis: $nis, nama: $nama, status: ${status.value})';
 
   @override
   bool operator ==(Object other) =>

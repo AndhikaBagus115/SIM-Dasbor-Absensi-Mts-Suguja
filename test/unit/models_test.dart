@@ -62,6 +62,12 @@ void main() {
   });
 
   group('Siswa Model Tests', () {
+    test('Siswa accepts the integer class ID used by Supabase writes', () {
+      final siswa = Siswa.fromJson({'id': 1, 'kelas_id': 7});
+      expect(siswa.kelasId, '7');
+      expect(Siswa.fromJson({'id': 2, 'kelas_id': null}).kelasId, isNull);
+    });
+
     test('Siswa fromJson and toJson works correctly', () {
       final json = {
         'id': 101,
