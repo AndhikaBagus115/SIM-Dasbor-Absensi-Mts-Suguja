@@ -3,11 +3,11 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 // lib/core/constants.dart
 class AppConstants {
   static const String schoolName = 'MTs Sunan Gunung Jati';
-  
+
   // Optional web overrides
   static String? _webSupabaseUrl;
   static String? _webSupabaseAnonKey;
-  
+
   /// Initialize web-specific constants (optional override)
   static void initializeForWeb({
     required String supabaseUrl,
@@ -16,7 +16,7 @@ class AppConstants {
     _webSupabaseUrl = supabaseUrl;
     _webSupabaseAnonKey = supabaseAnonKey;
   }
-  
+
   /// Get Supabase URL from environment variables or compile-time flags
   static String get supabaseUrl {
     // 1. Compile-time flag
@@ -27,7 +27,7 @@ class AppConstants {
     if (_webSupabaseUrl != null && _webSupabaseUrl!.isNotEmpty) {
       return _webSupabaseUrl!;
     }
-    
+
     // 3. Dotenv file
     final url = dotenv.env['SUPABASE_URL'];
     if (url != null && url.isNotEmpty) {
@@ -49,7 +49,7 @@ class AppConstants {
     if (_webSupabaseAnonKey != null && _webSupabaseAnonKey!.isNotEmpty) {
       return _webSupabaseAnonKey!;
     }
-    
+
     // 3. Dotenv file
     final key = dotenv.env['SUPABASE_ANON_KEY'];
     if (key != null && key.isNotEmpty) {
@@ -197,7 +197,7 @@ abstract class AbsensiColumns {
 abstract class SuratColumns {
   static const String id = 'id';
   static const String siswaId = 'siswa_id';
-  static const String tipe = 'tipe';
+  static const String tipe = 'jenis';
   static const String tanggal = 'tanggal';
   static const String alasan = 'alasan';
   static const String keterangan = 'keterangan';
@@ -246,7 +246,8 @@ enum AttendanceStatus {
   }
 
   /// Check if status indicates student is present
-  bool get isPresent => this == AttendanceStatus.hadir || this == AttendanceStatus.pulang;
+  bool get isPresent =>
+      this == AttendanceStatus.hadir || this == AttendanceStatus.pulang;
 
   /// Check if status indicates student is absent
   bool get isAbsent =>
@@ -279,17 +280,17 @@ enum LetterType {
 // GUI Status Color Mapping
 abstract class StatusColors {
   static const Map<String, int> attendanceColors = {
-    'hadir': 0xFF4CAF50,      // Green
-    'terlambat': 0xFFFFC107,   // Amber
-    'sakit': 0xFF2196F3,       // Blue
-    'izin': 0xFF9C27B0,        // Purple
-    'alfa': 0xFFF44336,        // Red
-    'pulang': 0xFF00BCD4,      // Cyan
+    'hadir': 0xFF4CAF50, // Green
+    'terlambat': 0xFFFFC107, // Amber
+    'sakit': 0xFF2196F3, // Blue
+    'izin': 0xFF9C27B0, // Purple
+    'alfa': 0xFFF44336, // Red
+    'pulang': 0xFF00BCD4, // Cyan
   };
 
   static const Map<String, int> studentStatusColors = {
-    'aktif': 0xFF4CAF50,       // Green
-    'lulus': 0xFF2196F3,       // Blue
+    'aktif': 0xFF4CAF50, // Green
+    'lulus': 0xFF2196F3, // Blue
     'tidak aktif': 0xFFFF5722, // Deep Orange
   };
 }

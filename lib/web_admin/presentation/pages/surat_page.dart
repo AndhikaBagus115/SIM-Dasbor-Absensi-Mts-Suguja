@@ -15,6 +15,8 @@ import 'package:universal_html/html.dart' as html;
 import 'package:archive/archive.dart';
 
 import '../../core/theme.dart';
+import '../../data/repositories/attendance_workflow_repository.dart';
+import '../widgets/surat_review_panel.dart';
 
 const List<String> jenisSuratList = ['izin', 'sakit'];
 
@@ -85,7 +87,9 @@ class _DataSuratPageState extends State<DataSuratPage> {
         ? List<Map<String, dynamic>>.from(_allSuratData)
         : _allSuratData.where((s) {
             final nama = (s['siswa']?['nama'] ?? '').toString().toLowerCase();
-            final nis = (s['siswa']?['nis'] ?? s['siswa_id'] ?? '').toString().toLowerCase();
+            final nis = (s['siswa']?['nis'] ?? s['siswa_id'] ?? '')
+                .toString()
+                .toLowerCase();
             return nama.contains(keyword) || nis.contains(keyword);
           }).toList();
 
@@ -302,7 +306,11 @@ class _DataSuratPageState extends State<DataSuratPage> {
               ),
               title: const Row(
                 children: [
-                  Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
+                  Icon(
+                    Icons.warning_amber_rounded,
+                    color: Colors.red,
+                    size: 28,
+                  ),
                   SizedBox(width: 10),
                   Text(
                     'Hapus Semua Data Surat',
@@ -481,7 +489,9 @@ class _DataSuratPageState extends State<DataSuratPage> {
       try {
         final response = await http.get(Uri.parse(fileUrl));
         if (response.statusCode != 200) {
-          _showSnackbar('Gagal mengambil gambar. Status: ${response.statusCode}');
+          _showSnackbar(
+            'Gagal mengambil gambar. Status: ${response.statusCode}',
+          );
           return;
         }
 
@@ -492,9 +502,8 @@ class _DataSuratPageState extends State<DataSuratPage> {
         pdf.addPage(
           pw.Page(
             pageFormat: PdfPageFormat.a4,
-            build: (_) => pw.Center(
-              child: pw.Image(image, fit: pw.BoxFit.contain),
-            ),
+            build: (_) =>
+                pw.Center(child: pw.Image(image, fit: pw.BoxFit.contain)),
           ),
         );
 
@@ -566,9 +575,7 @@ class _DataSuratPageState extends State<DataSuratPage> {
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(color: Colors.grey.shade200),
                     ),
-                    child: const Center(
-                      child: CircularProgressIndicator(),
-                    ),
+                    child: const Center(child: CircularProgressIndicator()),
                   )
                 : _buildTableCard(),
           ],
@@ -626,10 +633,7 @@ class _DataSuratPageState extends State<DataSuratPage> {
                 SizedBox(height: 2),
                 Text(
                   'Kelola dan arsipkan surat keterangan izin & sakit siswa',
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    color: Colors.white70,
-                  ),
+                  style: TextStyle(fontSize: 12.5, color: Colors.white70),
                 ),
               ],
             ),
@@ -644,7 +648,11 @@ class _DataSuratPageState extends State<DataSuratPage> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.school_outlined, color: Colors.white, size: 16),
+                const Icon(
+                  Icons.school_outlined,
+                  color: Colors.white,
+                  size: 16,
+                ),
                 const SizedBox(width: 8),
                 Text(
                   widget.schoolName,
@@ -663,7 +671,8 @@ class _DataSuratPageState extends State<DataSuratPage> {
   }
 
   Widget _buildFilterCard() {
-    final bool hasActiveFilter = selectedStartDate != null ||
+    final bool hasActiveFilter =
+        selectedStartDate != null ||
         selectedEndDate != null ||
         selectedJenisSurat != null ||
         searchController.text.isNotEmpty;
@@ -722,10 +731,16 @@ class _DataSuratPageState extends State<DataSuratPage> {
                     fetchSurat();
                   },
                   icon: const Icon(Icons.refresh_rounded, size: 15),
-                  label: const Text('Reset Filter', style: TextStyle(fontSize: 12)),
+                  label: const Text(
+                    'Reset Filter',
+                    style: TextStyle(fontSize: 12),
+                  ),
                   style: TextButton.styleFrom(
                     foregroundColor: Colors.grey.shade600,
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                   ),
                 ),
               ],
@@ -804,8 +819,15 @@ class _DataSuratPageState extends State<DataSuratPage> {
                       style: const TextStyle(fontSize: 13.5),
                       decoration: InputDecoration(
                         hintText: 'Cari nama atau NIS siswa...',
-                        hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13),
-                        prefixIcon: const Icon(Icons.search_rounded, size: 18, color: Colors.grey),
+                        hintStyle: TextStyle(
+                          color: Colors.grey.shade400,
+                          fontSize: 13,
+                        ),
+                        prefixIcon: const Icon(
+                          Icons.search_rounded,
+                          size: 18,
+                          color: Colors.grey,
+                        ),
                         suffixIcon: searchController.text.isNotEmpty
                             ? IconButton(
                                 icon: const Icon(Icons.clear, size: 16),
@@ -815,7 +837,10 @@ class _DataSuratPageState extends State<DataSuratPage> {
                                 },
                               )
                             : null,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
                         filled: true,
                         fillColor: Colors.grey.shade50,
                         border: OutlineInputBorder(
@@ -828,7 +853,10 @@ class _DataSuratPageState extends State<DataSuratPage> {
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+                          borderSide: const BorderSide(
+                            color: AppColors.primary,
+                            width: 1.5,
+                          ),
                         ),
                       ),
                     ),
@@ -839,7 +867,10 @@ class _DataSuratPageState extends State<DataSuratPage> {
                     width: isNarrow ? (constraints.maxWidth - 12) / 2 : 170,
                     child: DropdownButtonFormField<String?>(
                       initialValue: selectedJenisSurat,
-                      style: const TextStyle(fontSize: 13, color: AppColors.textDark),
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: AppColors.textDark,
+                      ),
                       items: [
                         const DropdownMenuItem<String?>(
                           value: null,
@@ -848,7 +879,9 @@ class _DataSuratPageState extends State<DataSuratPage> {
                         ...jenisSuratList.map(
                           (jenis) => DropdownMenuItem<String?>(
                             value: jenis,
-                            child: Text(jenis[0].toUpperCase() + jenis.substring(1)),
+                            child: Text(
+                              jenis[0].toUpperCase() + jenis.substring(1),
+                            ),
                           ),
                         ),
                       ],
@@ -858,10 +891,16 @@ class _DataSuratPageState extends State<DataSuratPage> {
                       },
                       decoration: InputDecoration(
                         labelText: 'Jenis Surat',
-                        labelStyle: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                        labelStyle: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade600,
+                        ),
                         filled: true,
                         fillColor: Colors.grey.shade50,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
                           borderSide: BorderSide(color: Colors.grey.shade300),
@@ -872,7 +911,10 @@ class _DataSuratPageState extends State<DataSuratPage> {
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+                          borderSide: const BorderSide(
+                            color: AppColors.primary,
+                            width: 1.5,
+                          ),
                         ),
                       ),
                     ),
@@ -919,13 +961,22 @@ class _DataSuratPageState extends State<DataSuratPage> {
                     width: isNarrow ? (constraints.maxWidth - 12) / 2 : 110,
                     child: DropdownButtonFormField<int>(
                       initialValue: _rowsPerPage,
-                      style: const TextStyle(fontSize: 13, color: AppColors.textDark),
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: AppColors.textDark,
+                      ),
                       decoration: InputDecoration(
                         labelText: 'Baris',
-                        labelStyle: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                        labelStyle: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade600,
+                        ),
                         filled: true,
                         fillColor: Colors.grey.shade50,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 8,
+                        ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
                           borderSide: BorderSide(color: Colors.grey.shade300),
@@ -936,7 +987,10 @@ class _DataSuratPageState extends State<DataSuratPage> {
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+                          borderSide: const BorderSide(
+                            color: AppColors.primary,
+                            width: 1.5,
+                          ),
                         ),
                       ),
                       items: const [5, 10, 20, 50]
@@ -1003,7 +1057,11 @@ class _DataSuratPageState extends State<DataSuratPage> {
         labelStyle: TextStyle(fontSize: 12, color: Colors.grey.shade600),
         filled: true,
         fillColor: Colors.grey.shade50,
-        prefixIcon: const Icon(Icons.calendar_today_outlined, size: 16, color: Colors.grey),
+        prefixIcon: const Icon(
+          Icons.calendar_today_outlined,
+          size: 16,
+          color: Colors.grey,
+        ),
         suffixIcon: currentValue != null
             ? IconButton(
                 icon: const Icon(Icons.clear, size: 16),
@@ -1194,8 +1252,12 @@ class _DataSuratPageState extends State<DataSuratPage> {
                               DateTime.parse(rawTanggal.toString()).toLocal(),
                             );
                       final int rowNumber = startIndex + i + 1;
-                      final String jenis = (s['jenis'] ?? '').toString().toLowerCase();
-                      final String displayNis = (s['siswa']?['nis'] ?? s['siswa_id'] ?? '-').toString();
+                      final String jenis = (s['jenis'] ?? '')
+                          .toString()
+                          .toLowerCase();
+                      final String displayNis =
+                          (s['siswa']?['nis'] ?? s['siswa_id'] ?? '-')
+                              .toString();
 
                       return DataRow(
                         cells: [
@@ -1237,10 +1299,16 @@ class _DataSuratPageState extends State<DataSuratPage> {
                               children: [
                                 CircleAvatar(
                                   radius: 14,
-                                  backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                                  backgroundColor: AppColors.primary.withValues(
+                                    alpha: 0.1,
+                                  ),
                                   child: Text(
-                                    ((s['siswa']?['nama'] ?? 'S').toString().isNotEmpty)
-                                        ? (s['siswa']?['nama'] ?? 'S').toString()[0].toUpperCase()
+                                    ((s['siswa']?['nama'] ?? 'S')
+                                            .toString()
+                                            .isNotEmpty)
+                                        ? (s['siswa']?['nama'] ?? 'S')
+                                              .toString()[0]
+                                              .toUpperCase()
                                         : 'S',
                                     style: const TextStyle(
                                       color: AppColors.primary,
@@ -1278,14 +1346,31 @@ class _DataSuratPageState extends State<DataSuratPage> {
                               ],
                             ),
                           ),
-                          DataCell(_buildJenisBadge(jenis)),
+                          DataCell(
+                            Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildJenisBadge(jenis),
+                                Text(
+                                  s['status']?.toString() ?? 'menunggu',
+                                  style: const TextStyle(fontSize: 11),
+                                ),
+                              ],
+                            ),
+                          ),
                           DataCell(
                             ElevatedButton.icon(
                               onPressed: () => _showDetailDialog(s),
-                              icon: const Icon(Icons.visibility_rounded, size: 15),
+                              icon: const Icon(
+                                Icons.visibility_rounded,
+                                size: 15,
+                              ),
                               label: const Text('Lihat'),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF10B981).withValues(alpha: 0.12),
+                                backgroundColor: const Color(
+                                  0xFF10B981,
+                                ).withValues(alpha: 0.12),
                                 foregroundColor: const Color(0xFF047857),
                                 elevation: 0,
                                 padding: const EdgeInsets.symmetric(
@@ -1445,7 +1530,8 @@ class _DataSuratPageState extends State<DataSuratPage> {
     final String fileUrl = (surat['file_url'] ?? '').toString();
     final bool hasFile = fileUrl.isNotEmpty;
     final String jenis = (surat['jenis'] ?? '').toString().toLowerCase();
-    final String displayNis = (surat['siswa']?['nis'] ?? surat['siswa_id'] ?? '-').toString();
+    final String displayNis =
+        (surat['siswa']?['nis'] ?? surat['siswa_id'] ?? '-').toString();
 
     showDialog(
       context: context,
@@ -1505,11 +1591,41 @@ class _DataSuratPageState extends State<DataSuratPage> {
                         const SizedBox(height: 6),
                         _buildDetailRow('NIS Siswa', displayNis),
                         const SizedBox(height: 6),
-                        _buildDetailRow('Nama Siswa', '${surat['siswa']?['nama'] ?? '-'}'),
+                        _buildDetailRow(
+                          'Nama Siswa',
+                          '${surat['siswa']?['nama'] ?? '-'}',
+                        ),
                         const SizedBox(height: 6),
                         _buildDetailRow('Tanggal Surat', tanggal),
+                        if (surat['tanggal_selesai'] != null)
+                          _buildDetailRow(
+                            'Sampai tanggal',
+                            surat['tanggal_selesai'].toString(),
+                          ),
                       ],
                     ),
+                  ),
+                  SuratReviewPanel(
+                    surat: surat,
+                    onReview: (approve, note) async {
+                      final result =
+                          await AttendanceWorkflowRepository(
+                            supabase,
+                          ).reviewSurat(
+                            surat['id'] as int,
+                            approve: approve,
+                            note: note,
+                          );
+                      if (mounted) {
+                        await fetchSurat();
+                        _showSnackbar(
+                          approve
+                              ? 'Surat disetujui dan presensi disinkronkan.'
+                              : 'Surat ditolak; presensi tetap.',
+                        );
+                      }
+                      return result;
+                    },
                   ),
                   const SizedBox(height: 18),
                   const Text(
@@ -1540,7 +1656,10 @@ class _DataSuratPageState extends State<DataSuratPage> {
                           const SizedBox(height: 8),
                           Text(
                             'Tidak ada foto/lampiran surat.',
-                            style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
+                            style: TextStyle(
+                              color: Colors.grey.shade500,
+                              fontSize: 13,
+                            ),
                           ),
                         ],
                       ),

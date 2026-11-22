@@ -121,13 +121,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final currentYear = now.year;
       final bool isJanToJun = now.month >= 1 && now.month <= 6;
 
-      final tglMulaiSemester = DateFormat('yyyy-MM-dd').format(
-        DateTime(currentYear, isJanToJun ? 1 : 7, 1),
-      );
+      final tglMulaiSemester = DateFormat(
+        'yyyy-MM-dd',
+      ).format(DateTime(currentYear, isJanToJun ? 1 : 7, 1));
 
-      final tglAkhirSemester = DateFormat('yyyy-MM-dd').format(
-        DateTime(currentYear, isJanToJun ? 6 : 12, isJanToJun ? 30 : 31),
-      );
+      // Approved letters may already contain future attendance dates.
+      final tglAkhirSemester = tglHariIni;
 
       // Eksekusi semua query secara paralel menggunakan Future.wait
       final results = await Future.wait<dynamic>([
@@ -252,7 +251,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
           'icon': Icons.access_time_filled,
           'color': const Color(0xFFEF5350),
           'title': 'Aktivitas Luar Jam Operasional',
-          'subtitle': 'Terdeteksi $inputLuarJam data diinput di luar jam sekolah.',
+          'subtitle':
+              'Terdeteksi $inputLuarJam data diinput di luar jam sekolah.',
         });
       }
 
@@ -355,15 +355,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           AppHeader(
                             lastUpdated: _lastUpdated,
                             errorMessage: _errorMessage,
-                            onRefresh: () => _fetchDashboardData(
-                              showLoadingOverlay: false,
-                            ),
+                            onRefresh: () =>
+                                _fetchDashboardData(showLoadingOverlay: false),
                           ),
                           const SizedBox(height: 16),
 
                           const SectionTitle(
                             title: 'Ringkasan Hari Ini',
-                            subtitle: 'Konsisten dengan siswa aktif dan status absensi.',
+                            subtitle:
+                                'Konsisten dengan siswa aktif dan status absensi.',
                           ),
                           const SizedBox(height: 12),
 
@@ -380,7 +380,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                           const SectionTitle(
                             title: 'Rekapan Semester',
-                            subtitle: 'Menghitung total potensi kehadiran berdasarkan hari unik yang memiliki data.',
+                            subtitle:
+                                'Menghitung total potensi kehadiran berdasarkan hari unik yang memiliki data.',
                           ),
                           const SizedBox(height: 12),
 
@@ -397,7 +398,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                           const SectionTitle(
                             title: 'Visualisasi',
-                            subtitle: 'Tren dan distribusi untuk membantu keputusan.',
+                            subtitle:
+                                'Tren dan distribusi untuk membantu keputusan.',
                           ),
                           const SizedBox(height: 12),
 
@@ -410,7 +412,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                           const SectionTitle(
                             title: 'Monitoring',
-                            subtitle: 'Peringatan sistem dan aktivitas terbaru.',
+                            subtitle:
+                                'Peringatan sistem dan aktivitas terbaru.',
                           ),
                           const SizedBox(height: 12),
 
