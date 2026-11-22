@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:web_admin_mts/web_admin/presentation/widgets/attendance_edit_dialog.dart';
 import 'package:web_admin_mts/web_admin/presentation/widgets/surat_review_panel.dart';
 
 void main() {
@@ -54,4 +55,42 @@ void main() {
     expect(find.text('Tolak surat'), findsNothing);
   });
 
+  testWidgets(
+    'manual correction requires a reason and preserves input on failure',
+    (tester) async {
+      var calls = 0;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: AttendanceEditDialog(
+              record: const {
+                'id': 1,
+                'status': 'hadir',
+                'waktu_masuk': '07:00:00.123456',
+              },
+              loadAudit: () async => [],
+              onSave: (status, masuk, pulang, keterangan, reason) async {
+                calls++;
+                expect(masuk, '07:00:00.123456');
+                expect(reason, 'Verifikasi guru');
+                throw StateError('conflict');
+              },
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('Simpan koreksi'));
+      await tester.pump();
+      expect(calls, 0);
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Alasan koreksi (wajib)'),
+        'Verifikasi guru',
+      );
+      await tester.tap(find.text('Simpan koreksi'));
+      await tester.pumpAndSettle();
+      expect(calls, 1);
+      expect(find.text('Verifikasi guru'), findsOneWidget);
+      expect(find.textContaining('conflict'), findsOneWidget);
+    },
+  );
 }

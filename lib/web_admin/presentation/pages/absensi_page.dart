@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 
 import '../../logic/absensi_controller.dart';
 import '../widgets/report_export_button.dart';
+import '../widgets/attendance_edit_dialog.dart';
+import '../../data/repositories/attendance_workflow_repository.dart';
 
 class PageAbsensi extends StatelessWidget {
   final String schoolName;
@@ -538,6 +540,50 @@ class _AbsensiTable extends StatelessWidget {
   final AbsensiController controller;
   const _AbsensiTable({required this.controller});
 
+  Future<void> _edit(BuildContext context, Map<String, dynamic> row) async {
+    final original = Map<String, dynamic>.unmodifiable(row);
+    final workflow = AttendanceWorkflowRepository(controller.supabase);
+    final List<String> statuses;
+    try {
+      statuses = await workflow.statusOptions();
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+      return;
+    }
+    if (!context.mounted) return;
+    final saved = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => AttendanceEditDialog(
+        record: original,
+        statusOptions: statuses,
+        loadAudit: () => workflow.audit(original['id'] as int),
+        onSave: (status, masuk, pulang, keterangan, reason) => workflow.correct(
+          original: original,
+          status: status,
+          masuk: masuk,
+          pulang: pulang,
+          keterangan: keterangan,
+          reason: reason,
+        ),
+      ),
+    );
+    if (saved == true && context.mounted) {
+      await controller.fetchData();
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Koreksi presensi dan jejak perubahan tersimpan.'),
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final displayData = controller.absensiData;
@@ -610,6 +656,7 @@ class _AbsensiTable extends StatelessWidget {
                       style: TextStyle(fontWeight: FontWeight.bold),
                     ),
                   ),
+                  DataColumn(label: Text('Aksi')),
                 ],
                 rows: List.generate(displayData.length, (index) {
                   final row = displayData[index];
@@ -641,6 +688,13 @@ class _AbsensiTable extends StatelessWidget {
                       ),
                       DataCell(
                         Text(diperbaruiOleh, overflow: TextOverflow.ellipsis),
+                      ),
+                      DataCell(
+                        IconButton(
+                          tooltip: 'Koreksi dan riwayat',
+                          icon: const Icon(Icons.edit_outlined),
+                          onPressed: () => _edit(context, row),
+                        ),
                       ),
                     ],
                   );
@@ -685,9 +739,7 @@ class _RekapTable extends StatelessWidget {
               constraints: BoxConstraints(minWidth: constraints.maxWidth),
               child: DataTable(
                 columnSpacing: 24,
-                headingRowColor: WidgetStateProperty.all(
-                  Colors.green.shade50,
-                ),
+                headingRowColor: WidgetStateProperty.all(Colors.green.shade50),
                 columns: const [
                   DataColumn(
                     label: Text(
@@ -847,10 +899,7 @@ class _EmptyStateView extends StatelessWidget {
   final AbsensiController controller;
   final String message;
 
-  const _EmptyStateView({
-    required this.controller,
-    required this.message,
-  });
+  const _EmptyStateView({required this.controller, required this.message});
 
   @override
   Widget build(BuildContext context) {
