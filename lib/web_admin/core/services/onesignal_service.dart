@@ -5,7 +5,31 @@ import 'logging_service.dart';
 
 /// Response structure from OneSignal Push API
 class OneSignalPushResult {
+  factory OneSignalPushResult.fromApi(Map<String, dynamic> body) {
+    final id = (body['id'] as String?)?.trim();
+    final created = id != null && id.isNotEmpty;
+    final errors = body['errors'];
+    final warnings = errors is List
+        ? errors.isNotEmpty
+        : errors is Map
+        ? errors.isNotEmpty
+        : errors != null && errors.toString().isNotEmpty;
+    return OneSignalPushResult(
+      success: created,
+      partial: created && warnings,
+      notificationId: created ? id : null,
+      recipients: (body['recipients'] as num?)?.toInt() ?? 0,
+      message: created && warnings
+          ? 'Sebagian target belum diterima: $errors (ID: $id).'
+          : created
+          ? 'Permintaan notifikasi diterima layanan (ID: $id).'
+          : 'Notifikasi tidak dibuat: ${body['errors'] ?? 'tidak ada penerima aktif'}.',
+      rawResponse: body,
+    );
+  }
+
   final bool success;
+  final bool partial;
   final String? notificationId;
   final int recipients;
   final String message;
@@ -13,6 +37,7 @@ class OneSignalPushResult {
 
   OneSignalPushResult({
     required this.success,
+    this.partial = false,
     this.notificationId,
     this.recipients = 0,
     required this.message,
@@ -42,9 +67,7 @@ class OneSignalService {
       final url = Uri.parse('$_baseUrl/apps/$appId');
       final resp = await http.get(
         url,
-        headers: {
-          'Authorization': 'Key $restApiKey',
-        },
+        headers: {'Authorization': 'Key $restApiKey'},
       );
       return resp.statusCode == 200;
     } catch (_) {
@@ -53,7 +76,7 @@ class OneSignalService {
   }
 
   /// Send push notification via OneSignal REST API
-  /// 
+  ///
   /// [title] Notification headline/title
   /// [message] Notification body text
   /// [targetExternalUserIds] List of external user IDs (e.g. `["siswa_12", "12", "NIS123"]`)
@@ -106,9 +129,7 @@ class OneSignalService {
       // Targeting Logic
       if (targetExternalUserIds != null && targetExternalUserIds.isNotEmpty) {
         // OneSignal v5 format & legacy backward compatibility
-        payload['include_aliases'] = {
-          'external_id': targetExternalUserIds,
-        };
+        payload['include_aliases'] = {'external_id': targetExternalUserIds};
         payload['include_external_user_ids'] = targetExternalUserIds;
         payload['channel_for_external_user_ids'] = 'push';
       } else if (targetSegments != null && targetSegments.isNotEmpty) {
@@ -136,7 +157,8 @@ class OneSignalService {
         final recipients = (responseBody['recipients'] as num?)?.toInt() ?? 0;
         final errors = responseBody['errors'];
 
-        if (errors != null && (errors is List && errors.isNotEmpty || errors is Map)) {
+        if (errors != null &&
+            (errors is List && errors.isNotEmpty || errors is Map)) {
           log.warning(
             'OneSignal returned partial errors: $errors',
             tag: 'OneSignalService',
@@ -148,15 +170,7 @@ class OneSignalService {
           tag: 'OneSignalService',
         );
 
-        return OneSignalPushResult(
-          success: true,
-          notificationId: notificationId,
-          recipients: recipients,
-          message: recipients > 0
-              ? 'Push notification berhasil dikirim ke $recipients perangkat'
-              : 'Push notification terkirim (ID: $notificationId)',
-          rawResponse: responseBody,
-        );
+        return OneSignalPushResult.fromApi(responseBody);
       } else {
         final errors = responseBody['errors'];
         final errorMsg = errors != null
@@ -197,10 +211,7 @@ class OneSignalService {
     required String message,
     Map<String, dynamic>? data,
   }) async {
-    final targets = <String>[
-      'siswa_$siswaId',
-      '$siswaId',
-    ];
+    final targets = <String>['siswa_$siswaId', '$siswaId'];
 
     if (nis != null && nis.trim().isNotEmpty) {
       targets.add('nis_${nis.trim()}');
@@ -283,8 +294,8 @@ class OneSignalService {
         final idStr = siswaId != null
             ? '$siswaId'
             : (studentExternalIds != null && studentExternalIds.isNotEmpty
-                ? studentExternalIds.first
-                : '');
+                  ? studentExternalIds.first
+                  : '');
         payload['target_channel'] = 'push';
         payload['include_aliases'] = {
           'external_id': [idStr],
@@ -298,9 +309,7 @@ class OneSignalService {
       } else if (targetTipe == 'kelas') {
         final extIds = studentExternalIds ?? [];
         payload['target_channel'] = 'push';
-        payload['include_aliases'] = {
-          'external_id': extIds,
-        };
+        payload['include_aliases'] = {'external_id': extIds};
         payload['include_external_user_ids'] = extIds;
         payload['channel_for_external_user_ids'] = 'push';
         payload['data'] = {
@@ -323,8 +332,6 @@ class OneSignalService {
       final responseBody = jsonDecode(response.body) as Map<String, dynamic>;
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        final notificationId = responseBody['id'] as String?;
-        final recipients = (responseBody['recipients'] as num?)?.toInt() ?? 0;
         final errors = responseBody['errors'];
 
         if (errors != null) {
@@ -334,15 +341,7 @@ class OneSignalService {
           );
         }
 
-        return OneSignalPushResult(
-          success: true,
-          notificationId: notificationId,
-          recipients: recipients,
-          message: recipients > 0
-              ? 'Push notification berhasil dikirim ke $recipients perangkat'
-              : 'Push notification berhasil dikirim (ID: $notificationId)',
-          rawResponse: responseBody,
-        );
+        return OneSignalPushResult.fromApi(responseBody);
       } else {
         final errors = responseBody['errors'];
         final errorMsg = errors != null
@@ -414,7 +413,8 @@ class OneSignalService {
       if (response.statusCode == 200 || response.statusCode == 201) {
         return {
           'success': true,
-          'message': '[SUKSES] Koneksi OneSignal REST API Berhasil! Kredensial Valid & Siap Digunakan.',
+          'message':
+              '[SUKSES] Koneksi OneSignal REST API Berhasil! Kredensial Valid & Siap Digunakan.',
           'data': data,
         };
       } else {

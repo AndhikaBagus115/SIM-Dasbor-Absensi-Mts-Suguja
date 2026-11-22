@@ -89,7 +89,9 @@ class PengumumanFormCard extends StatelessWidget {
                       Text(
                         'Kirim Notifikasi / Pengumuman Siswa',
                         style: TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.bold),
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       Text(
                         'Pilih target penerima (Semua / Kelas / Siswa), tulis pengumuman, lalu kirim ke OneSignal & WA',
@@ -151,8 +153,10 @@ class PengumumanFormCard extends StatelessWidget {
             // Target Specific Detail Container
             if (targetTipe == 'semua') ...[
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFFEEF2FF),
                   borderRadius: BorderRadius.circular(10),
@@ -160,14 +164,19 @@ class PengumumanFormCard extends StatelessWidget {
                 ),
                 child: const Row(
                   children: [
-                    Icon(Icons.info_outline,
-                        color: Color(0xFF4F46E5), size: 18),
+                    Icon(
+                      Icons.info_outline,
+                      color: Color(0xFF4F46E5),
+                      size: 18,
+                    ),
                     SizedBox(width: 10),
                     Expanded(
                       child: Text(
                         'Pengumuman akan dikirim ke seluruh HP wali murid yang memasang aplikasi (Segment: Total Subscriptions).',
-                        style:
-                            TextStyle(fontSize: 12, color: Color(0xFF3730A3)),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF3730A3),
+                        ),
                       ),
                     ),
                   ],
@@ -187,9 +196,10 @@ class PengumumanFormCard extends StatelessWidget {
                     const Text(
                       'Pilih Kelas Tujuan:',
                       style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF0F766E)),
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0F766E),
+                      ),
                     ),
                     const SizedBox(height: 8),
                     isLoadingKelas
@@ -200,16 +210,20 @@ class PengumumanFormCard extends StatelessWidget {
                               filled: true,
                               fillColor: Colors.white,
                               contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 14, vertical: 12),
+                                horizontal: 14,
+                                vertical: 12,
+                              ),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(10),
-                                borderSide:
-                                    const BorderSide(color: Color(0xFF99F6E4)),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFF99F6E4),
+                                ),
                               ),
                               enabledBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(10),
-                                borderSide:
-                                    const BorderSide(color: Color(0xFFCCFBF1)),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFFCCFBF1),
+                                ),
                               ),
                             ),
                             hint: const Text('Pilih Kelas (Contoh: Kelas 8A)'),
@@ -227,11 +241,15 @@ class PengumumanFormCard extends StatelessWidget {
                           ? const SizedBox(
                               height: 18,
                               width: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2))
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
                           : Row(
                               children: [
-                                const Icon(Icons.people_alt_outlined,
-                                    size: 16, color: Color(0xFF0F766E)),
+                                const Icon(
+                                  Icons.people_alt_outlined,
+                                  size: 16,
+                                  color: Color(0xFF0F766E),
+                                ),
                                 const SizedBox(width: 6),
                                 Text(
                                   'Total ${kelasSiswaList.length} siswa di $selectedKelasNama (External IDs: [${kelasSiswaList.map((e) => e['id']).take(4).join(', ')}${kelasSiswaList.length > 4 ? "..." : ""}])',
@@ -261,16 +279,15 @@ class PengumumanFormCard extends StatelessWidget {
                           onPressed: onClearStudent,
                         )
                       : isSearching
-                          ? const Padding(
-                              padding: EdgeInsets.all(12),
-                              child: SizedBox(
-                                width: 18,
-                                height: 18,
-                                child:
-                                    CircularProgressIndicator(strokeWidth: 2),
-                              ),
-                            )
-                          : null,
+                      ? const Padding(
+                          padding: EdgeInsets.all(12),
+                          child: SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        )
+                      : null,
                   filled: true,
                   fillColor: const Color(0xFFFFFBEB),
                   border: OutlineInputBorder(
@@ -316,13 +333,18 @@ class PengumumanFormCard extends StatelessWidget {
                         leading: const CircleAvatar(
                           radius: 14,
                           backgroundColor: Color(0xFFFEF3C7),
-                          child: Icon(Icons.person,
-                              size: 16, color: Color(0xFFD97706)),
+                          child: Icon(
+                            Icons.person,
+                            size: 16,
+                            color: Color(0xFFD97706),
+                          ),
                         ),
                         title: Text(
                           s['nama'] ?? '-',
                           style: const TextStyle(
-                              fontWeight: FontWeight.bold, fontSize: 13),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
                         ),
                         subtitle: Text(
                           'NIS: ${s['nis'] ?? '-'} • Kelas: $kelasNama • ID: ${s['id']}',
@@ -337,8 +359,10 @@ class PengumumanFormCard extends StatelessWidget {
               if (selectedStudent != null) ...[
                 const SizedBox(height: 8),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFFFEF3C7),
                     borderRadius: BorderRadius.circular(10),
@@ -346,8 +370,11 @@ class PengumumanFormCard extends StatelessWidget {
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.check_circle_rounded,
-                          color: Color(0xFFD97706), size: 18),
+                      const Icon(
+                        Icons.check_circle_rounded,
+                        color: Color(0xFFD97706),
+                        size: 18,
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
@@ -467,11 +494,14 @@ class PengumumanFormCard extends StatelessWidget {
               runSpacing: 6,
               children: [
                 _buildQuickIsiChip(
-                    'Diberitahukan kepada seluruh wali murid bahwa pembelajaran diliburkan mulai tanggal ... hingga ...'),
+                  'Diberitahukan kepada seluruh wali murid bahwa pembelajaran diliburkan mulai tanggal ... hingga ...',
+                ),
                 _buildQuickIsiChip(
-                    'Mohon kehadiran Bapak/Ibu wali murid pada pertemuan yang akan diselenggarakan pada hari Sabtu di aula sekolah.'),
+                  'Mohon kehadiran Bapak/Ibu wali murid pada pertemuan yang akan diselenggarakan pada hari Sabtu di aula sekolah.',
+                ),
                 _buildQuickIsiChip(
-                    'Diharapkan siswa mempersiapkan diri untuk mengikuti Ujian Akhir Semester dengan jadwal terlampir.'),
+                  'Diharapkan siswa mempersiapkan diri untuk mengikuti Ujian Akhir Semester dengan jadwal terlampir.',
+                ),
               ],
             ),
             const SizedBox(height: 8),
@@ -515,8 +545,9 @@ class PengumumanFormCard extends StatelessWidget {
                         height: 18,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          valueColor:
-                              AlwaysStoppedAnimation<Color>(Colors.white),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.white,
+                          ),
                         ),
                       )
                     : const Icon(Icons.send_rounded, size: 18),
@@ -525,7 +556,9 @@ class PengumumanFormCard extends StatelessWidget {
                       ? 'Mengirim Pengumuman...'
                       : 'Kirim Pengumuman Sekarang',
                   style: const TextStyle(
-                      fontSize: 14, fontWeight: FontWeight.bold),
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF4F46E5),
@@ -535,7 +568,14 @@ class PengumumanFormCard extends StatelessWidget {
                   ),
                   elevation: 2,
                 ),
-                onPressed: isSending ? null : onSendPengumuman,
+                onPressed:
+                    isSending ||
+                        (targetTipe == 'kelas' &&
+                            (isLoadingKelasSiswa ||
+                                selectedKelasId == null ||
+                                kelasSiswaList.isEmpty))
+                    ? null
+                    : onSendPengumuman,
               ),
             ),
           ],
@@ -598,10 +638,7 @@ class PengumumanFormCard extends StatelessWidget {
                   ),
                   Text(
                     subtitle,
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: Colors.grey.shade600,
-                    ),
+                    style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
                   ),
                 ],
               ),
@@ -666,10 +703,7 @@ class PengumumanFormCard extends StatelessWidget {
                   ),
                   Text(
                     subtitle,
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: Colors.grey.shade600,
-                    ),
+                    style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
                   ),
                 ],
               ),
@@ -682,8 +716,11 @@ class PengumumanFormCard extends StatelessWidget {
 
   Widget _buildQuickTitleChip(String title) {
     return ActionChip(
-      avatar: const Icon(Icons.label_outline_rounded,
-          size: 13, color: Color(0xFF4F46E5)),
+      avatar: const Icon(
+        Icons.label_outline_rounded,
+        size: 13,
+        color: Color(0xFF4F46E5),
+      ),
       label: Text(title, style: const TextStyle(fontSize: 11)),
       backgroundColor: const Color(0xFFEEF2FF),
       side: BorderSide(color: const Color(0xFFC7D2FE).withValues(alpha: 0.8)),
@@ -694,8 +731,11 @@ class PengumumanFormCard extends StatelessWidget {
 
   Widget _buildQuickIsiChip(String text) {
     return ActionChip(
-      avatar: const Icon(Icons.format_quote_rounded,
-          size: 13, color: Color(0xFF0D9488)),
+      avatar: const Icon(
+        Icons.format_quote_rounded,
+        size: 13,
+        color: Color(0xFF0D9488),
+      ),
       label: Text(
         text.length > 40 ? '${text.substring(0, 40)}...' : text,
         style: const TextStyle(fontSize: 11),
@@ -745,8 +785,11 @@ class PengumumanFormCard extends StatelessWidget {
             ),
             child: Row(
               children: [
-                const Icon(Icons.preview_rounded,
-                    color: Color(0xFF94A3B8), size: 16),
+                const Icon(
+                  Icons.preview_rounded,
+                  color: Color(0xFF94A3B8),
+                  size: 16,
+                ),
                 const SizedBox(width: 8),
                 const Text(
                   'Pratinjau Pengumuman (Live Preview)',
@@ -758,8 +801,10 @@ class PengumumanFormCard extends StatelessWidget {
                 ),
                 const Spacer(),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFF334155),
                     borderRadius: BorderRadius.circular(6),
@@ -808,8 +853,11 @@ class PengumumanFormCard extends StatelessWidget {
                                 color: const Color(0xFF4F46E5),
                                 borderRadius: BorderRadius.circular(6),
                               ),
-                              child: const Icon(Icons.school,
-                                  color: Colors.white, size: 12),
+                              child: const Icon(
+                                Icons.school,
+                                color: Colors.white,
+                                size: 12,
+                              ),
                             ),
                             const SizedBox(width: 6),
                             Expanded(
@@ -824,8 +872,7 @@ class PengumumanFormCard extends StatelessWidget {
                             ),
                             const Text(
                               'Baru saja',
-                              style:
-                                  TextStyle(fontSize: 9, color: Colors.grey),
+                              style: TextStyle(fontSize: 9, color: Colors.grey),
                             ),
                           ],
                         ),
@@ -870,8 +917,11 @@ class PengumumanFormCard extends StatelessWidget {
                       children: [
                         const Row(
                           children: [
-                            Icon(Icons.chat,
-                                color: Color(0xFF059669), size: 13),
+                            Icon(
+                              Icons.chat,
+                              color: Color(0xFF059669),
+                              size: 13,
+                            ),
                             SizedBox(width: 6),
                             Text(
                               'Format WhatsApp',

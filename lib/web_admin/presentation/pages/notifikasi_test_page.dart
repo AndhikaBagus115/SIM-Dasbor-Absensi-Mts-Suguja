@@ -5,6 +5,8 @@ import '../../core/services/master_data_cache_service.dart';
 import '../../core/services/notification_service.dart';
 import '../../core/services/onesignal_service.dart';
 import '../../data/models/pengumuman_model.dart';
+import '../../logic/pengumuman_controller.dart';
+import '../../data/repositories/report_repository.dart';
 import '../widgets/notifikasi/gateway_diagnostics_card.dart';
 import '../widgets/notifikasi/notifikasi_dialogs.dart';
 import '../widgets/notifikasi/pengumuman_form_card.dart';
@@ -35,32 +37,54 @@ class _NotifikasiTestPageState extends State<NotifikasiTestPage>
   // Controllers for Presensi Simulation & Direct Testing
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _searchController = TextEditingController();
-  final TextEditingController _pushTitleController =
-      TextEditingController(text: 'Uji Coba Push Notifikasi');
+  final TextEditingController _pushTitleController = TextEditingController(
+    text: 'Uji Coba Push Notifikasi',
+  );
   final TextEditingController _pushMessageController = TextEditingController(
-      text: 'Halo! Ini adalah pesan uji coba Push Notification dari Web Admin.');
+    text: 'Halo! Ini adalah pesan uji coba Push Notification dari Web Admin.',
+  );
   final TextEditingController _customNoteController = TextEditingController();
 
   final SupabaseClient _supabase = Supabase.instance.client;
+  final _recipients = ClassRecipientController(
+    loadStudents: (id, force) => force
+        ? ReportRepository.readAll(
+            (from, to) => Supabase.instance.client
+                .from('siswa')
+                .select('id,nis,nama,orang_tua_nomor,status')
+                .eq('kelas_id', id)
+                .eq('status', 'aktif')
+                .order('id')
+                .range(from, to)
+                .count(CountOption.exact),
+          )
+        : MasterDataCacheService.instance.getActiveSiswaByKelas(id),
+  );
+  late final _sender = PengumumanSender(
+    save: (record) async {
+      await _supabase.from('pengumuman').insert(record);
+    },
+  );
 
   // Loading States
   bool _isLoading = false;
   bool _isSendingPengumuman = false;
   bool _isSearching = false;
   bool _isLoadingKelas = false;
-  bool _isLoadingKelasSiswa = false;
+  bool get _isLoadingKelasSiswa => _recipients.isLoading;
   bool _isLoadingRiwayat = false;
   bool _isTablePengumumanMissing = false;
 
   // Target Selections for Pengumuman
   String _targetTipe = 'semua'; // 'semua' | 'kelas' | 'siswa'
-  int? _selectedKelasId;
+  int? get _selectedKelasId => _recipients.kelasId;
   String? _selectedKelasNama;
   List<Map<String, dynamic>> _daftarKelas = [];
-  List<Map<String, dynamic>> _kelasSiswaList = [];
+  List<Map<String, dynamic>> get _kelasSiswaList => _recipients.students;
 
   // Pengumuman Channel Selection
-  NotificationChannel _selectedPengumumanChannel = NotificationChannel.onesignal;
+  NotificationChannel _selectedPengumumanChannel =
+      NotificationChannel.onesignal;
 
   // Riwayat Pengumuman List
   List<Pengumuman> _riwayatPengumuman = [];
@@ -92,6 +116,7 @@ class _NotifikasiTestPageState extends State<NotifikasiTestPage>
       });
     });
 
+    _recipients.addListener(_onStateChanged);
     _fetchKelas();
     _fetchRiwayatPengumuman();
   }
@@ -102,6 +127,8 @@ class _NotifikasiTestPageState extends State<NotifikasiTestPage>
 
   @override
   void dispose() {
+    _recipients.removeListener(_onStateChanged);
+    _recipients.dispose();
     _mainTabController.dispose();
     _pengumumanJudulController.dispose();
     _pengumumanIsiController.dispose();
@@ -115,6 +142,7 @@ class _NotifikasiTestPageState extends State<NotifikasiTestPage>
   }
 
   void _addLog(String message) {
+    if (!mounted) return;
     final timestamp = DateTime.now().toString().split('.')[0];
     setState(() {
       _logOutput = '[$timestamp] $message\n$_logOutput';
@@ -126,8 +154,9 @@ class _NotifikasiTestPageState extends State<NotifikasiTestPage>
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor:
-            isError ? const Color(0xFFE53935) : const Color(0xFF2E7D32),
+        backgroundColor: isError
+            ? const Color(0xFFE53935)
+            : const Color(0xFF2E7D32),
         behavior: SnackBarBehavior.floating,
         duration: const Duration(seconds: 4),
       ),
@@ -141,55 +170,31 @@ class _NotifikasiTestPageState extends State<NotifikasiTestPage>
   Future<void> _fetchKelas({bool forceRefresh = false}) async {
     setState(() => _isLoadingKelas = true);
     try {
-      final response = await MasterDataCacheService.instance
-          .getKelasList(forceRefresh: forceRefresh);
+      final response = await MasterDataCacheService.instance.getKelasList(
+        forceRefresh: forceRefresh,
+      );
 
+      if (!mounted) return;
       setState(() {
         _daftarKelas = List<Map<String, dynamic>>.from(response);
         _isLoadingKelas = false;
       });
     } catch (e) {
+      if (!mounted) return;
       _addLog('[PERINGATAN] Gagal memuat daftar kelas: $e');
       setState(() => _isLoadingKelas = false);
     }
   }
 
   void _onKelasChanged(int? kelasId) {
-    setState(() {
-      _selectedKelasId = kelasId;
-      if (kelasId != null) {
-        final k = _daftarKelas.firstWhere(
-          (item) => item['id'] == kelasId,
-          orElse: () => {'nama_kelas': 'Kelas $kelasId'},
-        );
-        _selectedKelasNama = k['nama_kelas'] as String?;
-      } else {
-        _selectedKelasNama = null;
-      }
-      _kelasSiswaList = [];
+    if (_isSendingPengumuman) return;
+    final selected = _daftarKelas
+        .where((row) => row['id'] == kelasId)
+        .firstOrNull;
+    setState(() => _selectedKelasNama = selected?['nama_kelas'] as String?);
+    _recipients.selectClass(kelasId).then((_) {
+      if (_recipients.error != null) _addLog('[ERROR] ${_recipients.error}');
     });
-
-    if (kelasId != null) {
-      _fetchSiswaByKelas(kelasId);
-    }
-  }
-
-  Future<void> _fetchSiswaByKelas(int kelasId, {bool forceRefresh = false}) async {
-    setState(() => _isLoadingKelasSiswa = true);
-    try {
-      final response = await MasterDataCacheService.instance
-          .getActiveSiswaByKelas(kelasId, forceRefresh: forceRefresh);
-
-      setState(() {
-        _kelasSiswaList = List<Map<String, dynamic>>.from(response);
-        _isLoadingKelasSiswa = false;
-      });
-      _addLog(
-          '[INFO] Memuat ${_kelasSiswaList.length} siswa aktif di kelas $_selectedKelasNama');
-    } catch (e) {
-      _addLog('[ERROR] Gagal memuat siswa kelas $kelasId: $e');
-      setState(() => _isLoadingKelasSiswa = false);
-    }
   }
 
   Future<void> _fetchRiwayatPengumuman() async {
@@ -204,12 +209,14 @@ class _NotifikasiTestPageState extends State<NotifikasiTestPage>
           .map((e) => Pengumuman.fromJson(e as Map<String, dynamic>))
           .toList();
 
+      if (!mounted) return;
       setState(() {
         _riwayatPengumuman = list;
         _isLoadingRiwayat = false;
         _isTablePengumumanMissing = false;
       });
     } catch (e) {
+      if (!mounted) return;
       _addLog('[PERINGATAN] Riwayat pengumuman: $e');
       setState(() {
         _isLoadingRiwayat = false;
@@ -223,6 +230,7 @@ class _NotifikasiTestPageState extends State<NotifikasiTestPage>
 
   Future<void> _searchStudents(String query) async {
     if (query.trim().isEmpty) {
+      if (!mounted) return;
       setState(() {
         _searchResults = [];
         _isSearching = false;
@@ -236,16 +244,19 @@ class _NotifikasiTestPageState extends State<NotifikasiTestPage>
       final response = await _supabase
           .from('siswa')
           .select(
-              'id, nis, nama, orang_tua_nama, orang_tua_nomor, status, kelas(nama_kelas)')
+            'id, nis, nama, orang_tua_nama, orang_tua_nomor, status, kelas(nama_kelas)',
+          )
           .or('nama.ilike.%$query%,nis.ilike.%$query%')
           .eq('status', 'aktif')
           .limit(10);
 
+      if (!mounted) return;
       setState(() {
         _searchResults = List<Map<String, dynamic>>.from(response);
         _isSearching = false;
       });
     } catch (e) {
+      if (!mounted) return;
       _addLog('[ERROR] Gagal mencari siswa: $e');
       setState(() => _isSearching = false);
     }
@@ -273,164 +284,141 @@ class _NotifikasiTestPageState extends State<NotifikasiTestPage>
   // ============================================================
 
   Future<void> _sendPengumuman() async {
+    if (_isSendingPengumuman) return;
     final judul = _pengumumanJudulController.text.trim();
     final isi = _pengumumanIsiController.text.trim();
-
-    if (judul.isEmpty) {
-      _showSnackbar('Judul pengumuman tidak boleh kosong', isError: true);
+    if (judul.isEmpty || isi.isEmpty) {
+      _showSnackbar('Judul dan isi pengumuman wajib diisi.', isError: true);
       return;
     }
-    if (isi.isEmpty) {
-      _showSnackbar('Isi pengumuman tidak boleh kosong', isError: true);
-      return;
-    }
-
-    if (_targetTipe == 'kelas' && _selectedKelasId == null) {
-      _showSnackbar('Pilih kelas tujuan pengumuman terlebih dahulu',
-          isError: true);
-      return;
-    }
-
-    if (_targetTipe == 'siswa' && _selectedStudent == null) {
-      _showSnackbar('Pilih siswa tujuan pengumuman terlebih dahulu',
-          isError: true);
-      return;
-    }
-
-    setState(() => _isSendingPengumuman = true);
-
-    String targetNama = 'Semua Wali Murid';
-    String? targetId;
-
-    if (_targetTipe == 'kelas') {
-      targetId = _selectedKelasId.toString();
-      targetNama = _selectedKelasNama ?? 'Kelas $_selectedKelasId';
-    } else if (_targetTipe == 'siswa') {
-      targetId = (_selectedStudent!['id']).toString();
-      targetNama = _selectedStudent!['nama'] ?? 'Siswa';
-    }
-
-    _addLog('[INFO] Memulai pengiriman pengumuman: "$judul"');
-    _addLog(
-        '[INFO] Target: [$_targetTipe] $targetNama (ID: ${targetId ?? "ALL"})');
-    _addLog('[INFO] Jalur: ${_selectedPengumumanChannel.displayName}');
-
-    // 1. Simpan ke Supabase Tabel `pengumuman`
-    try {
-      final newRecord = {
-        'judul': judul,
-        'isi': isi,
-        'target_tipe': _targetTipe,
-        'target_id': targetId,
-        'target_nama': targetNama,
-        'created_at': DateTime.now().toUtc().toIso8601String(),
-      };
-
-      await _supabase.from('pengumuman').insert(newRecord);
-      _addLog('[SUKSES] Berhasil menyimpan pengumuman ke database Supabase');
-    } catch (e) {
-      _addLog('[PERINGATAN] Gagal menyimpan ke tabel `pengumuman`: $e');
-    }
-
-    // 2. Kirim via OneSignal REST API
-    List<String>? studentExternalIds;
-    int? targetSiswaId;
-    int? targetKelasId;
-
-    if (_targetTipe == 'siswa') {
-      targetSiswaId = _selectedStudent!['id'] as int;
-      studentExternalIds = ['$targetSiswaId'];
-    } else if (_targetTipe == 'kelas') {
-      targetKelasId = _selectedKelasId;
-      studentExternalIds =
-          _kelasSiswaList.map((s) => (s['id']).toString()).toList();
-    }
-
-    if (_selectedPengumumanChannel == NotificationChannel.onesignal ||
-        _selectedPengumumanChannel == NotificationChannel.both) {
-      final pushResult = await OneSignalService.sendPengumumanPush(
-        judul: judul,
-        isi: isi,
-        targetTipe: _targetTipe,
-        siswaId: targetSiswaId,
-        kelasId: targetKelasId,
-        studentExternalIds: studentExternalIds,
+    final target = _targetTipe;
+    final kelasId = _selectedKelasId;
+    final student = _selectedStudent == null
+        ? null
+        : Map<String, dynamic>.from(_selectedStudent!);
+    if (target == 'kelas' && !_recipients.isReady) {
+      _showSnackbar(
+        _recipients.error ??
+            'Tunggu daftar penerima kelas selesai dimuat dan pastikan tidak kosong.',
+        isError: true,
       );
-
-      _addLog(pushResult.success
-          ? '[SUKSES] OneSignal Push: ${pushResult.message}'
-          : '[GAGAL] OneSignal Push: ${pushResult.message}');
+      return;
     }
-
-    // 3. Kirim via WhatsApp (WAHA) jika dipilih
-    if (_selectedPengumumanChannel == NotificationChannel.whatsapp ||
-        _selectedPengumumanChannel == NotificationChannel.both) {
-      if (_targetTipe == 'siswa') {
-        final phone = _selectedStudent!['orang_tua_nomor'] as String?;
-        if (phone != null && phone.trim().isNotEmpty) {
-          final waMsg = '''Assalamu'alaikum Warahmatullahi Wabarakatuh,
-
-*PENGUMUMAN RESMI SEKOLAH*
-*${widget.schoolName}*
-
-*Judul:* *$judul*
-Ditujukan untuk: *${_selectedStudent!['nama']}* (NIS: ${_selectedStudent!['nis'] ?? '-'})
-
-$isi
-
-Wassalamu'alaikum Warahmatullahi Wabarakatuh
-_Pusat Informasi ${widget.schoolName}_''';
-
-          final waOk = await NotificationService.sendDirectWhatsApp(
+    if (target == 'siswa' && student == null) {
+      _showSnackbar('Pilih siswa tujuan terlebih dahulu.', isError: true);
+      return;
+    }
+    final channel = _selectedPengumumanChannel;
+    if (target == 'semua' && channel != NotificationChannel.onesignal) {
+      _showSnackbar(
+        'Broadcast semua wali murid tersedia melalui OneSignal. Pilih kanal OneSignal.',
+        isError: true,
+      );
+      return;
+    }
+    final students = target == 'siswa'
+        ? [student!]
+        : _kelasSiswaList.map(Map<String, dynamic>.from).toList();
+    final targetId = target == 'kelas'
+        ? kelasId?.toString()
+        : target == 'siswa'
+        ? student!['id'].toString()
+        : null;
+    final targetNama = target == 'kelas'
+        ? (_selectedKelasNama ?? 'Kelas $kelasId')
+        : target == 'siswa'
+        ? student!['nama'].toString()
+        : 'Semua Wali Murid';
+    final channels = <String, Future<DeliveryOutcome> Function()>{};
+    if (channel != NotificationChannel.whatsapp) {
+      channels['OneSignal'] = () async {
+        final result = await OneSignalService.sendPengumumanPush(
+          judul: judul,
+          isi: isi,
+          targetTipe: target,
+          siswaId: target == 'siswa' ? student!['id'] as int : null,
+          kelasId: target == 'kelas' ? kelasId : null,
+          studentExternalIds: students
+              .map((row) => row['id'].toString())
+              .toList(),
+        );
+        _addLog('[OneSignal] ${result.message}');
+        return result.partial
+            ? DeliveryOutcome.partial
+            : result.success
+            ? DeliveryOutcome.accepted
+            : DeliveryOutcome.failed;
+      };
+    }
+    if (channel != NotificationChannel.onesignal) {
+      channels['WhatsApp'] = () async {
+        var failures = 0;
+        var sent = 0;
+        final phones = <String>{};
+        for (final row in students) {
+          final phone = (row['orang_tua_nomor'] as String? ?? '').trim();
+          if (phone.isEmpty) {
+            failures++;
+            continue;
+          }
+          if (!phones.add(phone)) continue;
+          final ok = await NotificationService.sendDirectWhatsApp(
             phoneNumber: phone,
-            message: waMsg,
+            message:
+                'Pengumuman ${widget.schoolName}\n$judul\nTujuan: $targetNama\n\n$isi',
           );
-          _addLog(waOk
-              ? '[SUKSES] WhatsApp: Terkirim ke no $phone'
-              : '[GAGAL] WhatsApp: Gagal kirim ke no $phone');
-        } else {
-          _addLog(
-              '[PERINGATAN] WhatsApp: Nomor orang tua siswa ini tidak tersedia');
-        }
-      } else if (_targetTipe == 'kelas') {
-        int waSentCount = 0;
-        for (final s in _kelasSiswaList) {
-          final phone = s['orang_tua_nomor'] as String?;
-          if (phone != null && phone.trim().isNotEmpty) {
-            final waMsg = '''Assalamu'alaikum Warahmatullahi Wabarakatuh,
-
-*PENGUMUMAN KELAS ($_selectedKelasNama)*
-*${widget.schoolName}*
-
-*Judul:* *$judul*
-Untuk: *${s['nama']}*
-
-$isi
-
-Wassalamu'alaikum Warahmatullahi Wabarakatuh
-_Pusat Informasi ${widget.schoolName}_''';
-
-            final ok = await NotificationService.sendDirectWhatsApp(
-              phoneNumber: phone,
-              message: waMsg,
-            );
-            if (ok) waSentCount++;
+          if (ok) {
+            sent++;
+          } else {
+            failures++;
           }
         }
         _addLog(
-            '[INFO] WhatsApp: Selesai mengirim ke $waSentCount dari ${_kelasSiswaList.length} wali murid di $_selectedKelasNama');
-      } else {
-        _addLog(
-            '[INFO] WhatsApp: Broadcast ke semua wali murid via WhatsApp dilewati untuk mencegah banned nomor. Gunakan OneSignal Push.');
-      }
+          '[WhatsApp] $sent nomor berhasil; $failures penerima gagal atau tidak memiliki nomor.',
+        );
+        return sent == 0
+            ? DeliveryOutcome.failed
+            : failures == 0
+            ? DeliveryOutcome.accepted
+            : DeliveryOutcome.partial;
+      };
     }
-
-    setState(() => _isSendingPengumuman = false);
-    _showSnackbar('Pengumuman berhasil diproses dan dikirim!');
-
-    _pengumumanJudulController.clear();
-    _pengumumanIsiController.clear();
-    _fetchRiwayatPengumuman();
+    FocusScope.of(context).unfocus();
+    setState(() => _isSendingPengumuman = true);
+    try {
+      if (target == 'kelas') {
+        final fresh = await _recipients.snapshotForSend(kelasId!);
+        students
+          ..clear()
+          ..addAll(fresh);
+      }
+      final result = await _sender.send(
+        record: {
+          'judul': judul,
+          'isi': isi,
+          'target_tipe': target,
+          'target_id': targetId,
+          'target_nama': targetNama,
+          'created_at': DateTime.now().toUtc().toIso8601String(),
+        },
+        channels: channels,
+      );
+      if (!mounted) return;
+      _addLog(result.message);
+      for (final error in result.errors.entries) {
+        _addLog('[${error.key}] ${error.value}');
+      }
+      _showSnackbar(result.message, isError: !result.success);
+      if (result.success) {
+        _pengumumanJudulController.clear();
+        _pengumumanIsiController.clear();
+      }
+      if (result.saved) await _fetchRiwayatPengumuman();
+    } catch (e) {
+      _showSnackbar('Pengiriman gagal; input dipertahankan: $e', isError: true);
+    } finally {
+      if (mounted) setState(() => _isSendingPengumuman = false);
+    }
   }
 
   Future<void> _deletePengumuman(Pengumuman item) async {
@@ -439,11 +427,13 @@ _Pusat Informasi ${widget.schoolName}_''';
       builder: (ctx) => AlertDialog(
         title: const Text('Konfirmasi Hapus'),
         content: Text(
-            'Apakah Anda yakin ingin menghapus pengumuman "${item.judul}" dari riwayat?'),
+          'Apakah Anda yakin ingin menghapus pengumuman "${item.judul}" dari riwayat?',
+        ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Batal')),
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Batal'),
+          ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () => Navigator.pop(ctx, true),
@@ -479,7 +469,8 @@ _Pusat Informasi ${widget.schoolName}_''';
     final customNote = _customNoteController.text.trim();
 
     _addLog(
-        '[START] Memulai simulasi notifikasi presensi untuk: $studentName (ID: $studentId)');
+      '[START] Memulai simulasi notifikasi presensi untuk: $studentName (ID: $studentId)',
+    );
     _addLog('[CONFIG] Status: ${_selectedType.displayName}');
     _addLog('[CONFIG] Jalur: ${_selectedChannel.displayName}');
 
@@ -500,9 +491,11 @@ _Pusat Informasi ${widget.schoolName}_''';
       );
 
       _addLog('--- HASIL PENGIRIMAN ---');
-      _addLog(ok
-          ? '✅ [SUKSES] ${_selectedChannel.displayName}: Notifikasi terkirim'
-          : '❌ [GAGAL] ${_selectedChannel.displayName}: Pengiriman gagal');
+      _addLog(
+        ok
+            ? '✅ [SUKSES] ${_selectedChannel.displayName}: Notifikasi terkirim'
+            : '❌ [GAGAL] ${_selectedChannel.displayName}: Pengiriman gagal',
+      );
 
       _showSnackbar(
         ok
@@ -526,11 +519,14 @@ _Pusat Informasi ${widget.schoolName}_''';
     _addLog('[DIAGNOSTIK] Memeriksa status konfigurasi OneSignal REST API...');
     final isConfigured = OneSignalService.isConfigured;
     _addLog('[CONFIG] OneSignal App ID: ${AppConstants.onesignalAppId}');
-    _addLog('[CONFIG] REST API Key: ${AppConstants.onesignalRestApiKey.isNotEmpty ? "Tersedia (${AppConstants.onesignalRestApiKey.length} karakter)" : "KOSONG"}');
+    _addLog(
+      '[CONFIG] REST API Key: ${AppConstants.onesignalRestApiKey.isNotEmpty ? "Tersedia (${AppConstants.onesignalRestApiKey.length} karakter)" : "KOSONG"}',
+    );
 
     if (!isConfigured) {
       _addLog(
-          '[PERINGATAN] OneSignal belum terkonfigurasi lengkap di constants.dart!');
+        '[PERINGATAN] OneSignal belum terkonfigurasi lengkap di constants.dart!',
+      );
       _showSnackbar('OneSignal belum lengkap dikonfigurasi', isError: true);
       return;
     }
@@ -538,12 +534,16 @@ _Pusat Informasi ${widget.schoolName}_''';
     setState(() => _isLoading = true);
     try {
       final ok = await OneSignalService.verifyConnection();
-      _addLog(ok
-          ? '[SUKSES] Koneksi ke OneSignal REST API berhasil & valid!'
-          : '[GAGAL] Respon OneSignal tidak valid atau API Key salah');
-      _showSnackbar(ok
-          ? 'Koneksi OneSignal valid!'
-          : 'Verifikasi OneSignal gagal. Cek log.');
+      _addLog(
+        ok
+            ? '[SUKSES] Koneksi ke OneSignal REST API berhasil & valid!'
+            : '[GAGAL] Respon OneSignal tidak valid atau API Key salah',
+      );
+      _showSnackbar(
+        ok
+            ? 'Koneksi OneSignal valid!'
+            : 'Verifikasi OneSignal gagal. Cek log.',
+      );
     } catch (e) {
       _addLog('[ERROR] $e');
     } finally {
@@ -572,9 +572,11 @@ _Pusat Informasi ${widget.schoolName}_''';
         },
       );
 
-      _addLog(result.success
-          ? '[SUKSES] Broadcast OneSignal: ${result.message} (ID: ${result.notificationId})'
-          : '[GAGAL] Broadcast OneSignal: ${result.message}');
+      _addLog(
+        result.success
+            ? '[SUKSES] Broadcast OneSignal: ${result.message} (ID: ${result.notificationId})'
+            : '[GAGAL] Broadcast OneSignal: ${result.message}',
+      );
       _showSnackbar(result.message, isError: !result.success);
     } catch (e) {
       _addLog('[ERROR] $e');
@@ -603,9 +605,11 @@ _Pusat Informasi ${widget.schoolName}_''';
         message: testMsg,
       );
 
-      _addLog(ok
-          ? '[SUKSES] Pesan WhatsApp berhasil dikirim ke $phone'
-          : '[GAGAL] Gagal mengirim pesan via WAHA gateway');
+      _addLog(
+        ok
+            ? '[SUKSES] Pesan WhatsApp berhasil dikirim ke $phone'
+            : '[GAGAL] Gagal mengirim pesan via WAHA gateway',
+      );
       _showSnackbar(
         ok ? 'Pesan WhatsApp terkirim!' : 'Gagal kirim via WAHA',
         isError: !ok,
@@ -670,8 +674,10 @@ _Pusat Informasi ${widget.schoolName}_''';
     );
   }
 
-  Widget _buildHeader(
-      {required bool isWahaReady, required bool isOneSignalReady}) {
+  Widget _buildHeader({
+    required bool isWahaReady,
+    required bool isOneSignalReady,
+  }) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
       decoration: BoxDecoration(
@@ -697,8 +703,11 @@ _Pusat Informasi ${widget.schoolName}_''';
               color: Colors.white.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(Icons.campaign_rounded,
-                color: Colors.white, size: 28),
+            child: const Icon(
+              Icons.campaign_rounded,
+              color: Colors.white,
+              size: 28,
+            ),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -801,8 +810,10 @@ _Pusat Informasi ${widget.schoolName}_''';
         indicatorColor: const Color(0xFF4F46E5),
         indicatorWeight: 3,
         labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-        unselectedLabelStyle:
-            const TextStyle(fontWeight: FontWeight.normal, fontSize: 13),
+        unselectedLabelStyle: const TextStyle(
+          fontWeight: FontWeight.normal,
+          fontSize: 13,
+        ),
         tabs: const [
           Tab(
             icon: Icon(Icons.campaign_rounded, size: 18),
@@ -830,34 +841,38 @@ _Pusat Informasi ${widget.schoolName}_''';
             // Left Column: Form Pengumuman
             Expanded(
               flex: 6,
-              child: PengumumanFormCard(
-                judulController: _pengumumanJudulController,
-                isiController: _pengumumanIsiController,
-                searchController: _searchController,
-                targetTipe: _targetTipe,
-                onTargetTipeChanged: (val) => setState(() {
-                  _targetTipe = val;
-                  _selectedStudent = null;
-                }),
-                selectedKelasId: _selectedKelasId,
-                selectedKelasNama: _selectedKelasNama,
-                daftarKelas: _daftarKelas,
-                isLoadingKelas: _isLoadingKelas,
-                onKelasChanged: _onKelasChanged,
-                kelasSiswaList: _kelasSiswaList,
-                isLoadingKelasSiswa: _isLoadingKelasSiswa,
-                selectedStudent: _selectedStudent,
-                searchResults: _searchResults,
-                isSearching: _isSearching,
-                onSearchStudents: _searchStudents,
-                onSelectStudent: _selectStudent,
-                onClearStudent: _clearSelection,
-                selectedChannel: _selectedPengumumanChannel,
-                onChannelChanged: (NotificationChannel c) =>
-                    setState(() => _selectedPengumumanChannel = c),
-                isSending: _isSendingPengumuman,
-                onSendPengumuman: _sendPengumuman,
-                schoolName: widget.schoolName,
+              child: AbsorbPointer(
+                absorbing: _isSendingPengumuman,
+                child: PengumumanFormCard(
+                  judulController: _pengumumanJudulController,
+                  isiController: _pengumumanIsiController,
+                  searchController: _searchController,
+                  targetTipe: _targetTipe,
+                  onTargetTipeChanged: (val) => setState(() {
+                    _targetTipe = val;
+                    _selectedStudent = null;
+                    _recipients.selectClass(null);
+                  }),
+                  selectedKelasId: _selectedKelasId,
+                  selectedKelasNama: _selectedKelasNama,
+                  daftarKelas: _daftarKelas,
+                  isLoadingKelas: _isLoadingKelas,
+                  onKelasChanged: _onKelasChanged,
+                  kelasSiswaList: _kelasSiswaList,
+                  isLoadingKelasSiswa: _isLoadingKelasSiswa,
+                  selectedStudent: _selectedStudent,
+                  searchResults: _searchResults,
+                  isSearching: _isSearching,
+                  onSearchStudents: _searchStudents,
+                  onSelectStudent: _selectStudent,
+                  onClearStudent: _clearSelection,
+                  selectedChannel: _selectedPengumumanChannel,
+                  onChannelChanged: (NotificationChannel c) =>
+                      setState(() => _selectedPengumumanChannel = c),
+                  isSending: _isSendingPengumuman,
+                  onSendPengumuman: _sendPengumuman,
+                  schoolName: widget.schoolName,
+                ),
               ),
             ),
             const SizedBox(width: 20),
