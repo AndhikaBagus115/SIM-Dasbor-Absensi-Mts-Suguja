@@ -21,9 +21,11 @@ class DataSiswaLogic with ChangeNotifier {
     SupabaseClient? client,
     SiswaRepository? siswaRepo,
     KelasRepository? kelasRepo,
-  })  : supabase = client ?? Supabase.instance.client,
-        siswaRepository = siswaRepo ?? SiswaRepositoryImpl(client ?? Supabase.instance.client),
-        kelasRepository = kelasRepo ?? KelasRepositoryImpl(client ?? Supabase.instance.client);
+  }) : supabase = client ?? Supabase.instance.client,
+       siswaRepository =
+           siswaRepo ?? SiswaRepositoryImpl(client ?? Supabase.instance.client),
+       kelasRepository =
+           kelasRepo ?? KelasRepositoryImpl(client ?? Supabase.instance.client);
 
   // --- State ---
   bool _isLoading = true;
@@ -95,8 +97,9 @@ class DataSiswaLogic with ChangeNotifier {
     notifyListeners();
 
     try {
-      final response = await MasterDataCacheService.instance
-          .getKelasList(forceRefresh: forceRefresh);
+      final response = await MasterDataCacheService.instance.getKelasList(
+        forceRefresh: forceRefresh,
+      );
       _kelasList = List<Map<String, dynamic>>.from(response);
     } catch (e) {
       debugPrint('Error fetching kelas: $e');
@@ -109,7 +112,7 @@ class DataSiswaLogic with ChangeNotifier {
   }
 
   Future<void> fetchSiswa(String searchQuery, {bool resetPage = false}) async {
-    _lastSearchQuery = searchQuery; 
+    _lastSearchQuery = searchQuery;
 
     if (resetPage) {
       _currentPage = 1;
@@ -191,19 +194,15 @@ class DataSiswaLogic with ChangeNotifier {
     try {
       if (isLuluskan) {
         // OPSI 1: LULUSKAN SEMUA SISWA DI KELAS SUMBER (Misal 9A -> Lulus)
-        await supabase
-            .from('siswa')
-            .update({'status': 'lulus'})
-            .eq('kelas_id', sourceKelasId)
-            .eq('status', 'aktif'); // Hanya yang aktif
+        await siswaRepository.updateActiveSiswaByKelas(sourceKelasId, {
+          'status': 'lulus',
+        });
       } else {
         // OPSI 2: PINDAHKAN SEMUA SISWA (Misal 7A -> 8A)
         if (targetKelasId != null) {
-          await supabase
-              .from('siswa')
-              .update({'kelas_id': targetKelasId}) // Update ID Kelas
-              .eq('kelas_id', sourceKelasId)
-              .eq('status', 'aktif');
+          await siswaRepository.updateActiveSiswaByKelas(sourceKelasId, {
+            'kelas_id': targetKelasId,
+          });
         }
       }
 
@@ -222,10 +221,7 @@ class DataSiswaLogic with ChangeNotifier {
   /// Fungsi untuk mengubah status siswa (misal: aktif -> lulus, atau lulus -> aktif)
   Future<String?> updateStatusSiswa(int id, String status) async {
     try {
-      await supabase
-          .from('siswa')
-          .update({'status': status}) // Update kolom status
-          .eq('id', id);
+      await siswaRepository.updateSiswa(id, {'status': status});
 
       // Refresh data tabel agar perubahan langsung terlihat
       await fetchSiswa(_lastSearchQuery);
@@ -291,12 +287,11 @@ class DataSiswaLogic with ChangeNotifier {
       };
 
       if (isEdit) {
-        await supabase.from('siswa').update(data).eq('id', siswaId!);
+        await siswaRepository.updateSiswa(siswaId!, data);
       } else {
-        await supabase.from('siswa').insert(data);
+        await siswaRepository.createSiswa(data);
       }
 
-      MasterDataCacheService.instance.invalidateSiswa(kelasId: kelasId);
       await fetchSiswa(""); // Refresh tanpa reset filter
       return null;
     } catch (e) {
@@ -306,8 +301,7 @@ class DataSiswaLogic with ChangeNotifier {
 
   Future<String?> deleteSiswa(int id) async {
     try {
-      await supabase.from('siswa').delete().eq('id', id);
-      MasterDataCacheService.instance.invalidateSiswa();
+      await siswaRepository.deleteSiswa(id);
       await fetchSiswa("");
       return null;
     } catch (e) {
@@ -392,8 +386,7 @@ class DataSiswaLogic with ChangeNotifier {
       if (batchData.isEmpty) throw "Tidak ada data valid ditemukan.";
 
       // Bulk Insert
-      await supabase.from('siswa').upsert(batchData, onConflict: 'nis');
-      MasterDataCacheService.instance.invalidateSiswa(kelasId: targetKelasId);
+      await siswaRepository.upsertSiswa(batchData);
 
       // Tutup Loading
       if (context.mounted) {
@@ -550,8 +543,10 @@ class DataSiswaLogic with ChangeNotifier {
                 ),
                 pw.Text(
                   'Halaman ${ctx.pageNumber} dari ${ctx.pagesCount}',
-                  style:
-                      const pw.TextStyle(fontSize: 9, color: PdfColors.grey600),
+                  style: const pw.TextStyle(
+                    fontSize: 9,
+                    color: PdfColors.grey600,
+                  ),
                 ),
               ],
             ),

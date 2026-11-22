@@ -1,221 +1,181 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-/// Single cache entry wrapper with Time-To-Live (TTL) tracking
+/// Single cache entry with a shared clock for TTL and stale checks.
 class CacheEntry<T> {
   final T data;
   final DateTime timestamp;
   final Duration ttl;
+  final DateTime Function() _clock;
 
   CacheEntry({
     required this.data,
     required this.ttl,
     DateTime? timestamp,
-  }) : timestamp = timestamp ?? DateTime.now();
+    DateTime Function()? clock,
+  }) : _clock = clock ?? DateTime.now,
+       timestamp = timestamp ?? (clock ?? DateTime.now)();
 
-  bool get isExpired => DateTime.now().difference(timestamp) > ttl;
-
-  bool get isStale =>
-      DateTime.now().difference(timestamp) > (ttl * 0.7); // Stale threshold at 70% of TTL
+  bool get isExpired => _clock().difference(timestamp) > ttl;
+  bool get isStale => _clock().difference(timestamp) > (ttl * 0.7);
 }
 
-/// Centralized in-memory caching service for frequently accessed master data
-/// (Kelas, Guru, and Siswa per kelas) with Stale-While-Revalidate support.
+/// In-memory master data cache with stale-while-revalidate behavior.
 class MasterDataCacheService {
-  MasterDataCacheService._();
-  static final MasterDataCacheService instance = MasterDataCacheService._();
+  MasterDataCacheService({SupabaseClient? client, DateTime Function()? clock})
+    : _client = client,
+      _clock = clock ?? DateTime.now;
 
-  // Default TTL: 5 minutes for master data
+  static final MasterDataCacheService instance = MasterDataCacheService();
   static const Duration defaultMasterDataTtl = Duration(minutes: 5);
-  // Default TTL: 3 minutes for student lists
   static const Duration defaultSiswaTtl = Duration(minutes: 3);
 
-  CacheEntry<List<Map<String, dynamic>>>? _kelasCache;
-  CacheEntry<List<Map<String, dynamic>>>? _guruCache;
-  final Map<int, CacheEntry<List<Map<String, dynamic>>>> _siswaByKelasCache = {};
+  final SupabaseClient? _client;
+  final DateTime Function() _clock;
+  SupabaseClient get _supabase => _client ?? Supabase.instance.client;
 
-  SupabaseClient get _supabase => Supabase.instance.client;
+  late final _kelasCache = _CachedRows(
+    clock: _clock,
+    fetch: () async => List<Map<String, dynamic>>.from(
+      await _supabase
+          .from('kelas')
+          .select('id, nama_kelas')
+          .order('nama_kelas'),
+    ),
+  );
+  late final _guruCache = _CachedRows(
+    clock: _clock,
+    fetch: () async => List<Map<String, dynamic>>.from(
+      await _supabase
+          .from('guru')
+          .select('id, nama, email, role, avatar_url, kelas_diampu')
+          .order('nama'),
+    ),
+  );
+  final _siswaByKelasCache = <int, _CachedRows>{};
 
-  // ============================================================
-  // KELAS CACHE
-  // ============================================================
-
-  /// Get list of all classes, serving from memory cache when valid.
   Future<List<Map<String, dynamic>>> getKelasList({
     bool forceRefresh = false,
     Duration ttl = defaultMasterDataTtl,
-  }) async {
-    final cached = _kelasCache;
+  }) => _kelasCache.get(forceRefresh: forceRefresh, ttl: ttl);
 
-    if (!forceRefresh && cached != null && !cached.isExpired) {
-      // Trigger background revalidate if stale
-      if (cached.isStale) {
-        _revalidateKelasInBackground(ttl);
-      }
-      return List<Map<String, dynamic>>.from(cached.data);
-    }
-
-    return _fetchAndCacheKelas(ttl);
-  }
-
-  Future<List<Map<String, dynamic>>> _fetchAndCacheKelas(Duration ttl) async {
-    try {
-      final response = await _supabase
-          .from('kelas')
-          .select('id, nama_kelas')
-          .order('nama_kelas', ascending: true);
-
-      final data = List<Map<String, dynamic>>.from(response);
-      _kelasCache = CacheEntry(data: data, ttl: ttl);
-      return data;
-    } catch (e) {
-      debugPrint('[MasterDataCache] Error fetching kelas: $e');
-      if (_kelasCache != null) {
-        return List<Map<String, dynamic>>.from(_kelasCache!.data);
-      }
-      rethrow;
-    }
-  }
-
-  void _revalidateKelasInBackground(Duration ttl) {
-    _fetchAndCacheKelas(ttl).catchError((e) {
-      debugPrint('[MasterDataCache] Background revalidate kelas failed: $e');
-      return <Map<String, dynamic>>[];
-    });
-  }
-
-  /// Invalidate cached class list (e.g. after insert/update/delete)
-  void invalidateKelas() {
-    _kelasCache = null;
-    debugPrint('[MasterDataCache] Invalidation: Kelas cache cleared');
-  }
-
-  // ============================================================
-  // GURU CACHE
-  // ============================================================
-
-  /// Get list of all teachers, serving from memory cache when valid.
   Future<List<Map<String, dynamic>>> getGuruList({
     bool forceRefresh = false,
     Duration ttl = defaultMasterDataTtl,
-  }) async {
-    final cached = _guruCache;
+  }) => _guruCache.get(forceRefresh: forceRefresh, ttl: ttl);
 
-    if (!forceRefresh && cached != null && !cached.isExpired) {
-      if (cached.isStale) {
-        _revalidateGuruInBackground(ttl);
-      }
-      return List<Map<String, dynamic>>.from(cached.data);
-    }
-
-    return _fetchAndCacheGuru(ttl);
-  }
-
-  Future<List<Map<String, dynamic>>> _fetchAndCacheGuru(Duration ttl) async {
-    try {
-      final response = await _supabase
-          .from('guru')
-          .select('id, nama, email, role, avatar_url, kelas_diampu')
-          .order('nama', ascending: true);
-
-      final data = List<Map<String, dynamic>>.from(response);
-      _guruCache = CacheEntry(data: data, ttl: ttl);
-      return data;
-    } catch (e) {
-      debugPrint('[MasterDataCache] Error fetching guru: $e');
-      if (_guruCache != null) {
-        return List<Map<String, dynamic>>.from(_guruCache!.data);
-      }
-      rethrow;
-    }
-  }
-
-  void _revalidateGuruInBackground(Duration ttl) {
-    _fetchAndCacheGuru(ttl).catchError((e) {
-      debugPrint('[MasterDataCache] Background revalidate guru failed: $e');
-      return <Map<String, dynamic>>[];
-    });
-  }
-
-  /// Invalidate cached teacher list (e.g. after insert/update/delete)
-  void invalidateGuru() {
-    _guruCache = null;
-    debugPrint('[MasterDataCache] Invalidation: Guru cache cleared');
-  }
-
-  // ============================================================
-  // SISWA PER KELAS CACHE
-  // ============================================================
-
-  /// Get active students in a specific class with in-memory caching.
   Future<List<Map<String, dynamic>>> getActiveSiswaByKelas(
     int kelasId, {
     bool forceRefresh = false,
     Duration ttl = defaultSiswaTtl,
-  }) async {
-    final cached = _siswaByKelasCache[kelasId];
+  }) => _siswaByKelasCache
+      .putIfAbsent(
+        kelasId,
+        () => _CachedRows(
+          clock: _clock,
+          fetch: () async => List<Map<String, dynamic>>.from(
+            await _supabase
+                .from('siswa')
+                .select(
+                  'id, nis, nama, orang_tua_nama, orang_tua_nomor, status',
+                )
+                .eq('kelas_id', kelasId)
+                .eq('status', 'aktif')
+                .order('nama'),
+          ),
+        ),
+      )
+      .get(forceRefresh: forceRefresh, ttl: ttl);
 
-    if (!forceRefresh && cached != null && !cached.isExpired) {
-      if (cached.isStale) {
-        _revalidateSiswaInBackground(kelasId, ttl);
-      }
-      return List<Map<String, dynamic>>.from(cached.data);
-    }
+  void invalidateKelas() => _kelasCache.invalidate();
+  void invalidateGuru() => _guruCache.invalidate();
 
-    return _fetchAndCacheSiswaByKelas(kelasId, ttl);
-  }
-
-  Future<List<Map<String, dynamic>>> _fetchAndCacheSiswaByKelas(
-    int kelasId,
-    Duration ttl,
-  ) async {
-    try {
-      final response = await _supabase
-          .from('siswa')
-          .select('id, nis, nama, orang_tua_nama, orang_tua_nomor, status')
-          .eq('kelas_id', kelasId)
-          .eq('status', 'aktif')
-          .order('nama', ascending: true);
-
-      final data = List<Map<String, dynamic>>.from(response);
-      _siswaByKelasCache[kelasId] = CacheEntry(data: data, ttl: ttl);
-      return data;
-    } catch (e) {
-      debugPrint('[MasterDataCache] Error fetching siswa for kelas $kelasId: $e');
-      if (_siswaByKelasCache.containsKey(kelasId)) {
-        return List<Map<String, dynamic>>.from(_siswaByKelasCache[kelasId]!.data);
-      }
-      rethrow;
-    }
-  }
-
-  void _revalidateSiswaInBackground(int kelasId, Duration ttl) {
-    _fetchAndCacheSiswaByKelas(kelasId, ttl).catchError((e) {
-      debugPrint('[MasterDataCache] Background revalidate siswa ($kelasId) failed: $e');
-      return <Map<String, dynamic>>[];
-    });
-  }
-
-  /// Invalidate cached student lists (optionally for a specific class ID)
+  /// Student mutations invalidate every class unless a specific scope is known.
   void invalidateSiswa({int? kelasId}) {
     if (kelasId != null) {
-      _siswaByKelasCache.remove(kelasId);
-      debugPrint('[MasterDataCache] Invalidation: Siswa cache for kelas $kelasId cleared');
+      _siswaByKelasCache[kelasId]?.invalidate();
     } else {
-      _siswaByKelasCache.clear();
-      debugPrint('[MasterDataCache] Invalidation: All Siswa per-kelas caches cleared');
+      for (final cache in _siswaByKelasCache.values) {
+        cache.invalidate();
+      }
     }
   }
 
-  // ============================================================
-  // GLOBAL INVALIDATION
-  // ============================================================
-
-  /// Invalidate all in-memory master data caches
   void invalidateAll() {
     invalidateKelas();
     invalidateGuru();
     invalidateSiswa();
-    debugPrint('[MasterDataCache] Global Invalidation: All caches purged');
   }
+}
+
+/// One lifecycle for each class, teacher list, or student list.
+class _CachedRows {
+  _CachedRows({required this.fetch, required this.clock});
+
+  final Future<List<Map<String, dynamic>>> Function() fetch;
+  final DateTime Function() clock;
+  CacheEntry<List<Map<String, dynamic>>>? _entry;
+  Future<List<Map<String, dynamic>>>? _pending;
+  int _generation = 0;
+
+  Future<List<Map<String, dynamic>>> get({
+    bool forceRefresh = false,
+    required Duration ttl,
+  }) async {
+    final entry = _entry;
+    if (!forceRefresh && entry != null && !entry.isExpired) {
+      if (entry.isStale) {
+        unawaited(
+          _refresh(ttl).then<void>(
+            (_) {},
+            onError: (Object error) {
+              debugPrint('[MasterDataCache] Background refresh failed: $error');
+            },
+          ),
+        );
+      }
+      return _copyRows(entry.data);
+    }
+    return _copyRows(await _refresh(ttl));
+  }
+
+  Future<List<Map<String, dynamic>>> _refresh(Duration ttl) =>
+      _pending ??= _fetchAndCache(ttl, _generation);
+
+  Future<List<Map<String, dynamic>>> _fetchAndCache(
+    Duration ttl,
+    int generation,
+  ) async {
+    try {
+      List<Map<String, dynamic>> data;
+      try {
+        data = await Future.sync(fetch);
+      } catch (error) {
+        // An invalidated request must not restore stale data through fallback.
+        if (generation != _generation) return get(ttl: ttl);
+        debugPrint('[MasterDataCache] Fetch failed: $error');
+        final fallback = _entry;
+        if (fallback != null) return fallback.data;
+        rethrow;
+      }
+
+      if (generation != _generation) return get(ttl: ttl);
+      _entry = CacheEntry(data: _copyRows(data), ttl: ttl, clock: clock);
+      return _entry!.data;
+    } finally {
+      // An old completion must not detach a newer request.
+      if (generation == _generation) _pending = null;
+    }
+  }
+
+  void invalidate() {
+    _generation++;
+    _entry = null;
+    _pending = null;
+  }
+
+  List<Map<String, dynamic>> _copyRows(List<Map<String, dynamic>> rows) =>
+      rows.map((row) => Map<String, dynamic>.from(row)).toList();
 }
