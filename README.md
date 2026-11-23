@@ -83,7 +83,7 @@ Aplikasi ini terhubung langsung dengan ekosistem aplikasi mobile: **Mobile App G
 | **Dokumen & Cetak** | `pdf`, `printing` | Rendering & printing dokumen PDF |
 | **Ekspor Spreadsheet** | `excel`, `csv`, `archive` | Ekspor rekap data multi-format |
 | **Manajemen Window** | `window_manager` | Pengaturan ukuran dan window desktop |
-| **Konfigurasi Lingkungan**| `flutter_dotenv` | Manajemen variabel environment `.env` |
+| **Konfigurasi Lingkungan** | JSON publik / dart-define publik | Rahasia layanan hanya di Edge Functions |
 | **File Picker** | `file_picker`, `image_picker` | Unggah berkas dan lampiran |
 
 ---
@@ -103,7 +103,7 @@ lib/
     │   │   ├── logging_service.dart        # Logger & Logging Utilities
     │   │   ├── master_data_cache_service.dart # SWR Caching untuk Kelas, Guru, Siswa
     │   │   ├── notification_service.dart   # Service Notifikasi & Broadcast
-    │   │   └── onesignal_service.dart      # REST Client OneSignal Push Notification
+    │   │   └── onesignal_service.dart      # Client gateway notifikasi server
     │   └── utils/
     │       └── debouncer.dart              # Search Input Debouncer Utility
     │
@@ -164,24 +164,22 @@ git clone https://github.com/AndhikaBagus115/SIM-Dasbor-Absensi-Mts-Suguja.git
 cd SIM-Dasbor-Absensi-Mts-Suguja
 ```
 
-### 3. Konfigurasi Environment (`.env`)
-Salin file `.env.example` menjadi `.env`:
-```bash
-cp .env.example .env
-```
-Sesuaikan konfigurasi pada file `.env`:
-```env
-# Supabase Configuration
-SUPABASE_URL=https://your-project-url.supabase.co
-SUPABASE_ANON_KEY=your-anon-key-here
+### 3. Konfigurasi publik dan server
 
-# OneSignal Push Notification Configuration
-ONESIGNAL_APP_ID=your-onesignal-app-id-here
-ONESIGNAL_REST_API_KEY=your-onesignal-rest-api-key-here
+Salin `.env.example` menjadi `.env`, isi URL Supabase dan publishable/anon key, lalu jalankan:
 
-# App Configuration
-APP_ENVIRONMENT=development
+```powershell
+python tools/prepare_public_config.py
 ```
+
+Generator hanya memasukkan tiga field publik ke `assets/public_config.json`.
+File `.env` tidak menjadi asset. Jangan memakai service role atau kunci penyedia layanan di
+konfigurasi klien maupun `--dart-define`.
+
+OneSignal dan WAHA dikonfigurasi di Supabase Edge Functions, menggunakan template
+`supabase/functions/.env.example`. Pengiriman memerlukan sesi admin dan gateway server aktif.
+Ikuti [urutan aktivasi keamanan](docs/SECURITY-ROLLOUT.md), termasuk rotasi kunci lama dan
+prasyarat pembaruan login orang tua sebelum mengaktifkan policy RLS penuh.
 
 ### 4. Unduh Dependensi
 ```bash
@@ -208,7 +206,8 @@ Jalankan isi file tersebut melalui Supabase SQL Editor sebagai pengelola databas
 Migration ini disiapkan dan diuji lokal; penerapannya ke Supabase produksi dilakukan terpisah.
 
 Hak admin ditentukan dari `guru.id = auth.uid()` dan `guru.role = 'admin'`.
-Pastikan akun admin mempunyai baris guru tersebut dan policy yang ada melindungi perubahan `guru.role`.
+Pastikan akun admin mempunyai baris guru tersebut. Jalankan penguncian policy guru sesuai
+[panduan aktivasi](docs/SECURITY-ROLLOUT.md) agar role tidak dapat dinaikkan akun biasa.
 Endpoint baru memeriksa hak ini di server; identitas pengubah tidak diterima dari input klien.
 
 Migration menambahkan:
@@ -266,11 +265,17 @@ Transaksi dan otorisasi SQL dapat diuji pada PostgreSQL tertanam dengan fixture 
 ```bash
 npm install --prefix .dart_tool/sql_checks --no-save --no-package-lock --ignore-scripts --no-audit --no-fund @electric-sql/pglite@0.5.17
 node tools/test_attendance_workflows.mjs
+node tools/test_admin_security.mjs
+node --test tools/test_edge_functions.mjs
+python tools/test_public_config.py
 ```
 
 Dependency pengujian SQL disimpan di `.dart_tool` yang diabaikan Git. Pengujian mencakup rollback,
 audit, konflik koreksi, keputusan idempotent, rentang surat, notifikasi tanggal mendatang, enum aktual,
-serta penolakan akses guru dan anonim. Fixture webhook tidak melakukan request jaringan.
+serta penolakan akses guru dan anonim. Fixture webhook tidak melakukan request jaringan. Tes tambahan mencakup RLS antar-identitas,
+antrean hapus surat dan retry Storage, target notifikasi server, gate admin, UUID model/repository,
+serta query presensi `alfa`. Setelah build Web, jalankan `python tools/check_web_bundle.py`
+untuk memeriksa artifact terhadap asset environment dan nilai kunci privat lokal.
 
 ---
 
