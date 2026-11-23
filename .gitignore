@@ -47,3 +47,5 @@ app.*.map.json
 /android/app/release
 
 .vscode/templates
+# Generated allowlisted public configuration
+/assets/public_config.json

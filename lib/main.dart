@@ -1,9 +1,10 @@
 import 'dart:io' show Platform;
+import 'dart:convert';
 import 'dart:async';
+import 'package:flutter/services.dart';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -11,6 +12,7 @@ import 'package:window_manager/window_manager.dart';
 
 import 'web_admin/core/constants.dart';
 import 'web_admin/core/services/master_data_cache_service.dart';
+import 'web_admin/core/services/admin_notification_gateway.dart';
 import 'web_admin/presentation/widgets/admin_access_gate.dart';
 import 'web_admin/data/repositories/absensi_repository.dart';
 import 'web_admin/data/repositories/guru_repository.dart';
@@ -52,11 +54,12 @@ class _AdminSessionKey extends LocalKey {
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 0. Load environment variables (.env file if available, otherwise compile-time flags)
+  // Optional runtime public configuration; compile-time public values also work.
   try {
-    await dotenv.load(fileName: '.env');
-  } catch (e) {
-    debugPrint('Note: .env file not loaded directly ($e). Relying on compile-time environment flags.');
+    final raw = await rootBundle.loadString('assets/public_config.json');
+    AppConstants.loadPublicConfig(jsonDecode(raw) as Map<String, dynamic>);
+  } on FlutterError {
+    // File is optional when the two public dart-defines are supplied.
   }
 
   // 1. Initialize Supabase
@@ -174,6 +177,7 @@ class _AuthGateState extends State<AuthGate> {
       final nextUser = data.session?.user.id;
       if (nextUser != _userId || data.event == AuthChangeEvent.signedOut) {
         MasterDataCacheService.instance.invalidateAll();
+        AdminNotificationGateway.clear();
         _userId = nextUser;
       }
       if (mounted &&
@@ -238,6 +242,13 @@ class _AuthGateState extends State<AuthGate> {
                           .rpc('is_attendance_admin')
                           .timeout(const Duration(seconds: 12)) ==
                       true;
+                  if (allowed) {
+                    try {
+                      await AdminNotificationGateway.refreshStatus();
+                    } catch (_) {
+                      /* Status may be offline. */
+                    }
+                  }
                   return allowed;
                 },
                 onSignOut: () => supabase.auth.signOut(),
