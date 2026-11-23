@@ -15,6 +15,7 @@ import 'package:universal_html/html.dart' as html;
 import 'package:archive/archive.dart';
 
 import '../../core/theme.dart';
+import '../../core/services/surat_attachment_service.dart';
 import '../../data/repositories/attendance_workflow_repository.dart';
 import '../widgets/surat_review_panel.dart';
 
@@ -217,7 +218,9 @@ class _DataSuratPageState extends State<DataSuratPage> {
             lower.endsWith('.webp');
         if (!isImage) continue;
 
-        final resp = await http.get(Uri.parse(url));
+        final resp = await http.get(
+          Uri.parse(await SuratAttachmentService.signedUrl(url)),
+        );
         if (resp.statusCode != 200) continue;
 
         final siswaName = (s['siswa']?['nama'] ?? 'unknown').toString();
@@ -477,6 +480,15 @@ class _DataSuratPageState extends State<DataSuratPage> {
       return;
     }
 
+    String downloadUrl;
+    try {
+      downloadUrl = await SuratAttachmentService.signedUrl(fileUrl);
+    } catch (_) {
+      _showSnackbar(
+        'Lampiran tidak dapat diakses. Periksa izin dan lokasi file.',
+      );
+      return;
+    }
     final lower = fileUrl.toLowerCase();
     final isImage =
         lower.endsWith('.png') ||
@@ -487,7 +499,7 @@ class _DataSuratPageState extends State<DataSuratPage> {
     if (isImage) {
       _showSnackbar('Mengunduh & mengonversi gambar ke PDF...');
       try {
-        final response = await http.get(Uri.parse(fileUrl));
+        final response = await http.get(Uri.parse(downloadUrl));
         if (response.statusCode != 200) {
           _showSnackbar(
             'Gagal mengambil gambar. Status: ${response.statusCode}',
@@ -537,7 +549,7 @@ class _DataSuratPageState extends State<DataSuratPage> {
       return;
     }
 
-    final uri = Uri.parse(fileUrl);
+    final uri = Uri.parse(downloadUrl);
     if (!await canLaunchUrl(uri)) {
       _showSnackbar('URL tidak bisa dibuka.');
       return;
@@ -1519,7 +1531,7 @@ class _DataSuratPageState extends State<DataSuratPage> {
     );
   }
 
-  void _showDetailDialog(Map<String, dynamic> surat) {
+  Future<void> _showDetailDialog(Map<String, dynamic> surat) async {
     final rawTanggal = surat['tanggal'];
     final String tanggal = rawTanggal == null
         ? '-'
@@ -1529,6 +1541,15 @@ class _DataSuratPageState extends State<DataSuratPage> {
 
     final String fileUrl = (surat['file_url'] ?? '').toString();
     final bool hasFile = fileUrl.isNotEmpty;
+    String? previewUrl;
+    if (hasFile) {
+      try {
+        previewUrl = await SuratAttachmentService.signedUrl(fileUrl);
+      } catch (_) {
+        _showSnackbar('Pratinjau lampiran tidak dapat diakses.');
+      }
+    }
+    if (!mounted) return;
     final String jenis = (surat['jenis'] ?? '').toString().toLowerCase();
     final String displayNis =
         (surat['siswa']?['nis'] ?? surat['siswa_id'] ?? '-').toString();
@@ -1679,7 +1700,7 @@ class _DataSuratPageState extends State<DataSuratPage> {
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Image.network(
-                              fileUrl,
+                              previewUrl ?? '',
                               fit: BoxFit.contain,
                               loadingBuilder: (c, child, progress) {
                                 if (progress == null) return child;

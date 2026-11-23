@@ -1,4 +1,5 @@
 import 'dart:io' show Platform;
+import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -9,6 +10,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'web_admin/core/constants.dart';
+import 'web_admin/core/services/master_data_cache_service.dart';
+import 'web_admin/presentation/widgets/admin_access_gate.dart';
 import 'web_admin/data/repositories/absensi_repository.dart';
 import 'web_admin/data/repositories/guru_repository.dart';
 import 'web_admin/data/repositories/kelas_repository.dart';
@@ -28,6 +31,23 @@ import 'web_admin/data/data_profil.dart';
 import 'web_admin/presentation/pages/password_recovery_screen.dart';
 
 final supabase = Supabase.instance.client;
+
+// Preserve pages on profile updates; refresh authorization when the token changes.
+// A raw JWT must never appear in a widget key's diagnostic string.
+class _AdminSessionKey extends LocalKey {
+  final String userId;
+  final String _token;
+  const _AdminSessionKey(this.userId, this._token);
+  @override
+  bool operator ==(Object other) =>
+      other is _AdminSessionKey &&
+      userId == other.userId &&
+      _token == other._token;
+  @override
+  int get hashCode => Object.hash(userId, _token);
+  @override
+  String toString() => 'AdminSession($userId)';
+}
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -86,41 +106,43 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Admin MTs Suguja',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+        fontFamily: 'Poppins',
+        useMaterial3: true,
+        visualDensity: VisualDensity.adaptivePlatformDensity,
+      ),
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [Locale('id', 'ID'), Locale('en', 'US')],
+      home: const AuthGate(),
+    );
+  }
+}
+
+class AdminRepositoryScope extends StatelessWidget {
+  final Widget child;
+  const AdminRepositoryScope({super.key, required this.child});
+  @override
+  Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        Provider<SiswaRepository>(
-          create: (_) => SiswaRepositoryImpl(supabase),
-        ),
-        Provider<GuruRepository>(
-          create: (_) => GuruRepositoryImpl(supabase),
-        ),
-        Provider<KelasRepository>(
-          create: (_) => KelasRepositoryImpl(supabase),
-        ),
+        Provider<SiswaRepository>(create: (_) => SiswaRepositoryImpl(supabase)),
+        Provider<GuruRepository>(create: (_) => GuruRepositoryImpl(supabase)),
+        Provider<KelasRepository>(create: (_) => KelasRepositoryImpl(supabase)),
         Provider<AbsensiRepository>(
           create: (_) => AbsensiRepositoryImpl(supabase),
         ),
-        Provider<SuratRepository>(
-          create: (_) => SuratRepositoryImpl(supabase),
-        ),
+        Provider<SuratRepository>(create: (_) => SuratRepositoryImpl(supabase)),
       ],
-      child: MaterialApp(
-        title: 'Admin MTs Suguja',
-        debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          primarySwatch: Colors.blue,
-          fontFamily: 'Poppins',
-          useMaterial3: true,
-          visualDensity: VisualDensity.adaptivePlatformDensity,
-        ),
-        localizationsDelegates: const [
-          GlobalMaterialLocalizations.delegate,
-          GlobalWidgetsLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
-        ],
-        supportedLocales: const [Locale('id', 'ID'), Locale('en', 'US')],
-        home: const AuthGate(),
-      ),
+
+      child: child,
     );
   }
 }
@@ -134,18 +156,36 @@ class AuthGate extends StatefulWidget {
 
 class _AuthGateState extends State<AuthGate> {
   late bool _isPasswordRecovery;
+  StreamSubscription<AuthState>? _authSubscription;
+  String? _userId;
 
   @override
   void initState() {
     super.initState();
     // Deteksi instan jika halaman dibuka dari URL reset password (?code=... atau type=recovery)
     final uri = Uri.base;
-    _isPasswordRecovery = (kIsWeb && uri.queryParameters.containsKey('code')) ||
+    _isPasswordRecovery =
+        (kIsWeb && uri.queryParameters.containsKey('code')) ||
         (kIsWeb && uri.queryParameters['type'] == 'recovery') ||
         (kIsWeb && uri.fragment.contains('type=recovery'));
 
-    // Listen ke event stream Supabase jika event recovery terpicu
-    supabase.auth.onAuthStateChange.listen((data) {
+    _userId = supabase.auth.currentUser?.id;
+    _authSubscription = supabase.auth.onAuthStateChange.listen((data) {
+      final nextUser = data.session?.user.id;
+      if (nextUser != _userId || data.event == AuthChangeEvent.signedOut) {
+        MasterDataCacheService.instance.invalidateAll();
+        _userId = nextUser;
+      }
+      if (mounted &&
+          (data.event == AuthChangeEvent.signedOut ||
+              data.event == AuthChangeEvent.signedIn ||
+              data.event == AuthChangeEvent.tokenRefreshed)) {
+        // Dialog routes live above the dashboard subtree; remove their old data too.
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      }
+      if (data.event == AuthChangeEvent.signedOut && mounted) {
+        setState(() => _isPasswordRecovery = false);
+      }
       if (data.event == AuthChangeEvent.passwordRecovery) {
         if (mounted) {
           setState(() {
@@ -154,6 +194,12 @@ class _AuthGateState extends State<AuthGate> {
         }
       }
     });
+  }
+
+  @override
+  void dispose() {
+    _authSubscription?.cancel();
+    super.dispose();
   }
 
   @override
@@ -172,6 +218,10 @@ class _AuthGateState extends State<AuthGate> {
 
     return StreamBuilder<AuthState>(
       stream: supabase.auth.onAuthStateChange,
+      initialData: AuthState(
+        AuthChangeEvent.initialSession,
+        supabase.auth.currentSession,
+      ),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
@@ -180,7 +230,22 @@ class _AuthGateState extends State<AuthGate> {
         }
         final session = snapshot.data?.session;
         return session != null
-            ? const AdminDashboardPage()
+            ? AdminAccessGate(
+                key: _AdminSessionKey(session.user.id, session.accessToken),
+                checkAdmin: () async {
+                  final allowed =
+                      await supabase
+                          .rpc('is_attendance_admin')
+                          .timeout(const Duration(seconds: 12)) ==
+                      true;
+                  return allowed;
+                },
+                onSignOut: () => supabase.auth.signOut(),
+                builder: (_) => AdminRepositoryScope(
+                  key: ValueKey(session.user.id),
+                  child: const AdminDashboardPage(),
+                ),
+              )
             : const LoginScreen();
       },
     );
@@ -222,12 +287,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   Widget build(BuildContext context) {
     final List<Widget> pages = [
       const DashboardScreen(),
-      const PageAbsensi(
-        schoolName: AppConstants.schoolName,
-      ),
-      const PageGuru(
-        schoolName: AppConstants.schoolName,
-      ),
+      const PageAbsensi(schoolName: AppConstants.schoolName),
+      const PageGuru(schoolName: AppConstants.schoolName),
       PageKelas(
         schoolName: AppConstants.schoolName,
         onViewSiswa: _navigateToSiswaPerKelas,
@@ -236,15 +297,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         schoolName: AppConstants.schoolName,
         initialKelasId: _selectedKelasId,
       ),
-      const DataSuratPage(
-        schoolName: AppConstants.schoolName,
-      ),
-      const NotifikasiTestPage(
-        schoolName: AppConstants.schoolName,
-      ),
-      ProfilAdminPage(
-        schoolName: AppConstants.schoolName,
-      ),
+      const DataSuratPage(schoolName: AppConstants.schoolName),
+      const NotifikasiTestPage(schoolName: AppConstants.schoolName),
+      ProfilAdminPage(schoolName: AppConstants.schoolName),
     ];
 
     final int safeIndex = (_selectedIndex < pages.length && _selectedIndex >= 0)
@@ -261,10 +316,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           Expanded(
             child: Container(
               color: const Color(0xFFf5f7fa),
-              child: IndexedStack(
-                index: safeIndex,
-                children: pages,
-              ),
+              child: IndexedStack(index: safeIndex, children: pages),
             ),
           ),
         ],
