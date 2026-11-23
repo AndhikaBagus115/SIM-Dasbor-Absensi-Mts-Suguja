@@ -107,5 +107,6 @@ class Absensi {
           tanggal.day == (other.tanggal).day;
 
   @override
-  int get hashCode => id.hashCode ^ siswaId.hashCode ^ tanggal.hashCode;
+  int get hashCode =>
+      Object.hash(id, siswaId, tanggal.year, tanggal.month, tanggal.day);
 }

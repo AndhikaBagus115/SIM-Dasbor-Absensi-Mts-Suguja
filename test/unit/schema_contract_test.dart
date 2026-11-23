@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:web_admin_mts/web_admin/data/models/absensi_model.dart';
 import 'package:web_admin_mts/web_admin/data/models/guru_model.dart';
 import 'package:web_admin_mts/web_admin/data/models/kelas_model.dart';
 import 'package:web_admin_mts/web_admin/data/models/surat_model.dart';
@@ -51,5 +52,20 @@ void main() {
     expect(kelas.toJson()['wali_kelas'], guruId);
     expect(kelas.toJson().keys, isNot(contains('tingkat')));
     expect(kelas.toJson().keys, isNot(contains('jumlah_siswa')));
+  });
+  test('Same attendance day resolves to the same Set and Map entry', () {
+    Absensi record(int hour) => Absensi(
+      id: 1,
+      siswaId: 2,
+      tanggal: DateTime(2026, 11, 22, hour),
+      status: AttendanceStatus.hadir,
+      createdAt: DateTime(2026),
+    );
+    final pagi = record(7);
+    final sore = record(15);
+    expect(pagi, sore);
+    expect({pagi}.contains(sore), isTrue);
+    expect({pagi: 'tersimpan'}[sore], 'tersimpan');
+    expect({pagi, sore}, hasLength(1));
   });
 }
