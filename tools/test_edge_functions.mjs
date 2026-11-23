@@ -3,6 +3,7 @@ import test from 'node:test';
 import { backend } from '../supabase/functions/_shared/backend.mjs';
 import { HttpError } from '../supabase/functions/_shared/http.mjs';
 import { notificationHandler } from '../supabase/functions/admin-notifications/handler.mjs';
+import { cleanupHandler, objectPath } from '../supabase/functions/cleanup-surat/handler.mjs';
 
 const request = payload => new Request('https://fixture.test', { method: 'POST',
   headers: { authorization: 'Bearer fixture-user-token', 'Content-Type': 'application/json' },
@@ -112,4 +113,42 @@ test('diagnostics expose booleans; provider exceptions are sanitized', async () 
   const response=await handler(request(input));
   assert.equal(response.status,502);
   assert.ok(!(await response.text()).includes('fixture-secret'));
+});
+
+const url='https://project.test/storage/v1/object/public/surat_keterangan/one.jpg';
+function cleanupFixture(overrides={}) {
+  return { authorize:async()=>({id:'admin'}),supabaseUrl:'https://project.test',
+    claim:async()=>[],isReferenced:async()=>false,remove:async()=>{},
+    finish:async()=>{},summary:async()=>({pending:false}),...overrides };
+}
+test('cleanup failure retains durable job and retry can finish it later', async () => {
+  const job={id:1,file_url:url,lease_token:'lease'};
+  let queued=true, outage=true, claimed=false, state='pending';
+  const handler=cleanupHandler(cleanupFixture({
+    claim:async()=>{if(!queued||claimed)return [];claimed=true;return [job];},
+    remove:async()=>{if(outage)throw new Error('Storage outage');},
+    finish:async(id,token,ok)=>{assert.equal(token,'lease');state=ok?'done':'pending';if(ok)queued=false;},
+    summary:async()=>({pending:queued}),
+  }));
+  const first=await (await handler(request({action:'retry'}))).json();
+  assert.equal(first.failed,1);
+  assert.equal(state,'pending');
+  outage=false;claimed=false;
+  const retry=await (await handler(request({action:'retry'}))).json();
+  assert.equal(retry.completed,1);
+  assert.equal(state,'done');
+  assert.equal(retry.pending,false);
+});
+test('shared attachments and foreign/invalid object URLs are never removed', async () => {
+  for (const [file,shared] of [[url,true],['https://other.test/storage/v1/object/public/surat_keterangan/one.jpg',false],
+    ['https://project.test/storage/v1/object/public/avatars/one.jpg',false]]) {
+    let claimed=false, removed=0;
+    const handler=cleanupHandler(cleanupFixture({
+      claim:async()=>claimed?[]:(claimed=true,[{id:1,file_url:file,lease_token:'lease'}]),
+      isReferenced:async()=>shared,remove:async()=>{removed++;},
+    }));
+    await handler(request({action:'retry'}));
+    assert.equal(removed,0);
+  }
+  assert.throws(()=>objectPath('https://project.test/storage/v1/object/public/surat_keterangan/a%2F..%2Fother.jpg','https://project.test'));
 });

@@ -91,7 +91,7 @@ try {
   `);
   for (const name of ['202611220001_attendance_workflows.sql',
     ...(process.argv.includes('--baseline') ? [] : ['../preflight/lock_guru_roles.sql',
-      '202611220002_admin_access.sql'])]) {
+      '202611220002_admin_access.sql','202611220003_surat_deletion_queue.sql'])]) {
     const migration = await readFile(new URL('../supabase/migrations/' + name, import.meta.url), 'utf8');
     await db.exec(migration);
     await db.exec(migration);
@@ -162,6 +162,58 @@ try {
     await rejects("update public.surat set status='disetujui' where id=1");
     const approved = await rows('select public.review_surat(2,true,$1) result',['Verified']);
     assert.equal(approved[0].result.status,'disetujui');
+  });
+  await test('deletion and durable cleanup jobs commit together and retries are idempotent', async () => {
+    await as(admin);
+    const result = (await rows(enqueue,[batch,[2,1,1]]))[0].result;
+    assert.equal(result.deleted,2);
+    assert.equal((await rows('select * from public.surat')).length,0);
+    const jobs=await rows('select * from public.surat_deletion_jobs order by surat_id');
+    assert.equal(jobs.length,2);
+    assert.equal(jobs[0].snapshot.siswa_id,1);
+    assert.equal(jobs[0].state,'pending');
+    assert.equal((await rows(enqueue,[batch,[1,2]]))[0].result.deleted,2);
+    assert.equal((await rows('select * from public.surat_deletion_jobs')).length,2);
+    await rejects(enqueue,[batch,[1]],'22023');
+    await rejects('select * from public.claim_surat_cleanup()');
+  });
+  await test('queue persistence failure rolls back every deleted letter', async () => {
+    await as(admin);
+    await db.exec('reset role');
+    await db.exec(`create function public.fail_cleanup_job() returns trigger language plpgsql as
+      $$ begin raise exception 'Fixture queue write failure'; end; $$;
+      create trigger fail_cleanup_job before insert on public.surat_deletion_jobs
+      for each row execute function public.fail_cleanup_job();`);
+    await as(admin);
+    await rejects(enqueue,[batch,[1,2]],'P0001');
+    assert.equal((await rows('select * from public.surat')).length,2);
+    assert.equal((await rows('select * from public.surat_deletion_batches')).length,0);
+  });
+  await test('non-admin deletion cannot create cleanup work or remove data', async () => {
+    await as(teacher);
+    await rejects(enqueue,[batch,[1]]);
+    assert.equal((await rows('delete from public.surat where id=1 returning id')).length,0);
+    assert.equal((await rows('select * from public.surat_deletion_jobs')).length,0);
+  });
+  await test('worker leases preserve failed jobs and reject stale completion tokens', async () => {
+    await as(admin);
+    await rows(enqueue,[batch,[1]]);
+    await as(null,'service_role');
+    const job=(await rows('select * from public.claim_surat_cleanup()'))[0];
+    assert.equal(job.attempts,1);
+    await rejects('select public.finish_surat_cleanup($1,$2,true,null)',[job.id,batch],'40001');
+    await rows('select public.finish_surat_cleanup($1,$2,false,$3)',[job.id,job.lease_token,'Fixture Storage outage']);
+    const failed=(await rows('select * from public.surat_deletion_jobs'))[0];
+    assert.equal(failed.state,'pending');
+    assert.equal(failed.last_error,'Fixture Storage outage');
+    assert.equal((await rows('select * from public.claim_surat_cleanup()')).length,0);
+    await db.exec('reset role');
+    await db.exec("update public.surat_deletion_jobs set next_attempt_at=now()-interval '1 second'");
+    await as(null,'service_role');
+    const retry=(await rows('select * from public.claim_surat_cleanup()'))[0];
+    assert.equal(retry.attempts,2);
+    await rows('select public.finish_surat_cleanup($1,$2,true,null)',[retry.id,retry.lease_token]);
+    assert.equal((await rows('select state from public.surat_deletion_jobs'))[0].state,'done');
   });
   console.log(`${passed} security and deletion PostgreSQL tests passed.`);
 } catch (error) {

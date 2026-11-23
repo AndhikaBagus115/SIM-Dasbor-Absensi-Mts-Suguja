@@ -16,6 +16,8 @@ import 'package:archive/archive.dart';
 
 import '../../core/theme.dart';
 import '../../core/services/surat_attachment_service.dart';
+import '../../data/repositories/report_repository.dart';
+import '../../data/repositories/surat_deletion_repository.dart';
 import '../../data/repositories/attendance_workflow_repository.dart';
 import '../widgets/surat_review_panel.dart';
 
@@ -50,7 +52,8 @@ class _DataSuratPageState extends State<DataSuratPage> {
   late final TextEditingController _startDateCtrl;
   late final TextEditingController _endDateCtrl;
 
-  static const String _bucketName = 'surat_keterangan';
+  String? _pendingBatchId;
+  List<int>? _pendingDeleteIds;
 
   @override
   void initState() {
@@ -121,22 +124,6 @@ class _DataSuratPageState extends State<DataSuratPage> {
     );
   }
 
-  String? _extractObjectPathFromPublicUrl({
-    required String fileUrl,
-    required String bucketName,
-  }) {
-    try {
-      final uri = Uri.parse(fileUrl);
-      final path = uri.path;
-      final marker = '/storage/v1/object/public/$bucketName/';
-      final idx = path.indexOf(marker);
-      if (idx == -1) return null;
-      return path.substring(idx + marker.length);
-    } catch (_) {
-      return null;
-    }
-  }
-
   Future<void> fetchSurat() async {
     setState(() => isLoading = true);
 
@@ -159,7 +146,13 @@ class _DataSuratPageState extends State<DataSuratPage> {
         query = query.eq('jenis', selectedJenisSurat!);
       }
 
-      final response = await query.order('tanggal', ascending: false);
+      final response = await ReportRepository.readAll(
+        (from, to) => query
+            .order('tanggal', ascending: false)
+            .order('id')
+            .range(from, to)
+            .count(CountOption.exact),
+      );
       final allData = List<Map<String, dynamic>>.from(response);
 
       if (mounted) {
@@ -178,13 +171,15 @@ class _DataSuratPageState extends State<DataSuratPage> {
     }
   }
 
-  Future<List<Map<String, dynamic>>> _fetchAllSuratForGlobalAction() async {
-    final res = await supabase
-        .from('surat')
-        .select('id, siswa_id, tanggal, jenis, file_url, siswa(nama, nis)')
-        .order('tanggal', ascending: false);
-    return List<Map<String, dynamic>>.from(res);
-  }
+  Future<List<Map<String, dynamic>>> _fetchAllSuratForGlobalAction() =>
+      ReportRepository.readAll(
+        (from, to) => supabase
+            .from('surat')
+            .select('id, siswa_id, tanggal, jenis, file_url, siswa(nama, nis)')
+            .order('id')
+            .range(from, to)
+            .count(CountOption.exact),
+      );
 
   Future<void> _backupAllSuratToZipWeb() async {
     if (!kIsWeb) {
@@ -328,7 +323,7 @@ class _DataSuratPageState extends State<DataSuratPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'Tindakan ini akan menghapus SEMUA data surat dari database dan file lampiran dari penyimpanan storage.',
+                      'Tindakan ini menghapus semua data surat. Lampiran dibersihkan setelah data berhasil dihapus; proses yang tertunda dapat dicoba ulang.',
                       style: TextStyle(fontSize: 13.5, height: 1.4),
                     ),
                     const SizedBox(height: 14),
@@ -427,48 +422,59 @@ class _DataSuratPageState extends State<DataSuratPage> {
     confirmCtrl.dispose();
   }
 
+  Future<void> _retrySuratCleanup() async {
+    setState(() => isLoading = true);
+    try {
+      final result = await SuratDeletionRepository(supabase).retryCleanup();
+      _showSnackbar(
+        result['pending'] == true
+            ? 'Sebagian lampiran masih menunggu. Coba lagi setelah 1 menit.'
+            : 'Pembersihan lampiran selesai.',
+      );
+    } catch (_) {
+      _showSnackbar(
+        'Pembersihan belum selesai. Antrean tersimpan dan dapat dicoba ulang.',
+      );
+    } finally {
+      if (mounted) setState(() => isLoading = false);
+    }
+  }
+
   Future<void> _deleteAllSuratAndStorage(
     List<Map<String, dynamic>> items,
   ) async {
     setState(() => isLoading = true);
-
-    int deletedFiles = 0;
-    int deletedRows = 0;
-
+    final ids = items.map((row) => row['id'] as int).toList()..sort();
+    if (!listEquals(ids, _pendingDeleteIds)) {
+      _pendingBatchId = SuratDeletionRepository.newBatchId();
+      _pendingDeleteIds = ids;
+    }
     try {
-      final paths = <String>[];
-      for (final s in items) {
-        final fileUrl = (s['file_url'] ?? '').toString().trim();
-        if (fileUrl.isEmpty) continue;
-
-        final path = _extractObjectPathFromPublicUrl(
-          fileUrl: fileUrl,
-          bucketName: _bucketName,
-        );
-        if (path != null) {
-          paths.add(path);
-        }
-      }
-
-      for (int i = 0; i < paths.length; i += 100) {
-        final part = paths.sublist(i, min(i + 100, paths.length));
-        await supabase.storage.from(_bucketName).remove(part);
-        deletedFiles += part.length;
-      }
-
-      final ids = items.map((e) => e['id']).toList();
-      for (int i = 0; i < ids.length; i += 200) {
-        final part = ids.sublist(i, min(i + 200, ids.length));
-        await supabase.from('surat').delete().inFilter('id', part);
-        deletedRows += part.length;
-      }
-
+      final repository = SuratDeletionRepository(supabase);
+      final deleted = await repository.enqueue(ids, batchId: _pendingBatchId!);
+      _pendingBatchId = null;
+      _pendingDeleteIds = null;
       _showSnackbar(
-        'Selesai. Terhapus: $deletedRows data surat & $deletedFiles file storage.',
+        '$deleted data surat terhapus. Lampiran masuk antrean pembersihan.',
       );
+      if (!mounted) return;
       await fetchSurat();
-    } catch (e) {
-      _showSnackbar('Gagal menghapus data: $e');
+      try {
+        final cleanup = await repository.retryCleanup();
+        _showSnackbar(
+          cleanup['pending'] == true
+              ? '$deleted data terhapus; sebagian lampiran menunggu pembersihan. Gunakan Bersihkan Lampiran.'
+              : '$deleted data terhapus; pembersihan lampiran selesai.',
+        );
+      } catch (_) {
+        _showSnackbar(
+          '$deleted data terhapus. Pembersihan tertunda; gunakan Bersihkan Lampiran.',
+        );
+      }
+    } catch (_) {
+      _showSnackbar(
+        'Penghapusan belum terkonfirmasi. Muat ulang data sebelum mencoba kembali.',
+      );
     } finally {
       if (mounted) setState(() => isLoading = false);
     }
@@ -575,6 +581,14 @@ class _DataSuratPageState extends State<DataSuratPage> {
 
             // 2. Filter & Action Card
             _buildFilterCard(),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: isLoading ? null : _retrySuratCleanup,
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('Bersihkan Lampiran'),
+              ),
+            ),
 
             const SizedBox(height: 20),
 
