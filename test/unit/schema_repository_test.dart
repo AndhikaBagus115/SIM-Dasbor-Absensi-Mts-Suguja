@@ -5,6 +5,7 @@ import 'package:http/testing.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:web_admin_mts/web_admin/data/repositories/guru_repository.dart';
 import 'package:web_admin_mts/web_admin/data/repositories/kelas_repository.dart';
+import 'package:web_admin_mts/web_admin/data/repositories/attendance_notification_repository.dart';
 
 void main() {
   const guruId = '55b1344c-7471-4e71-a767-3cd59e02ed7c';
@@ -68,6 +69,45 @@ void main() {
         client,
       ).createKelas({'nama_kelas': '7A', 'wali_kelas': guruId});
       expect(kelas.waliKelasId, guruId);
+    },
+  );
+  test(
+    'absence notification query uses actual alfa enum and reads every page',
+    () async {
+      var requests = 0;
+      final client = SupabaseClient(
+        'https://fixture.test',
+        'fixture-public',
+        httpClient: MockClient((request) async {
+          requests++;
+          expect(request.url.queryParameters['status'], 'eq.alfa');
+          expect(request.url.queryParameters['tanggal'], 'eq.2026-11-22');
+          expect(
+            int.parse(request.url.queryParameters['offset']!),
+            requests - 1,
+          );
+          return http.Response(
+            jsonEncode([
+              {
+                'siswa_id': requests,
+                'siswa': {'id': requests, 'nama': 'Siswa fixture'},
+              },
+            ]),
+            200,
+            request: request,
+            headers: {
+              'content-type': 'application/json',
+              'content-range': '${requests - 1}-${requests - 1}/2',
+            },
+          );
+        }),
+      );
+      addTearDown(client.dispose);
+      final records = await AttendanceNotificationRepository(
+        client,
+      ).absentOn('2026-11-22');
+      expect(records.map((row) => row['siswa_id']), [1, 2]);
+      expect(requests, 2);
     },
   );
 }

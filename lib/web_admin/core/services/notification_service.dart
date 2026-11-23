@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../constants.dart';
+import '../../data/repositories/attendance_notification_repository.dart';
 import 'logging_service.dart';
 import 'onesignal_service.dart';
 
@@ -493,14 +494,12 @@ class NotificationService {
     try {
       final today = DateTime.now().toIso8601String().split('T')[0];
 
-      final absentRecords = await _supabase
-          .from('absensi')
-          .select('siswa_id, siswa(id, nis, nama, orang_tua_nomor)')
-          .eq('tanggal', today)
-          .eq('status', 'alpa');
+      final absentRecords = await AttendanceNotificationRepository(
+        _supabase,
+      ).absentOn(today);
 
       log.info(
-        'Found ${(absentRecords as List).length} absent students today. Sending via ${channel.displayName}',
+        'Found ${absentRecords.length} absent students today. Sending via ${channel.displayName}',
         tag: 'NotificationService',
       );
 
