@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/constants.dart';
-import 'core/theme.dart';
+import 'presentation/widgets/auth/academic_login_shell.dart';
+import 'presentation/widgets/auth/login_design.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -40,7 +41,7 @@ class _LoginScreenState extends State<LoginScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: AppColors.error,
+        backgroundColor: LoginDesign.error,
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -93,19 +94,21 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  void _showForgotPasswordDialog() {
-    final initialEmail =
-        _emailController.text.trim().replaceAll('@gmail.com', '');
-    final resetEmailController =
-        TextEditingController(text: initialEmail);
+  void _showForgotPasswordDialog(BuildContext presentationContext) {
+    final initialEmail = _emailController.text.trim().replaceAll(
+      '@gmail.com',
+      '',
+    );
+    final resetEmailController = TextEditingController(text: initialEmail);
     final resetFormKey = GlobalKey<FormState>();
     bool isResetting = false;
 
     showDialog(
-      context: context,
+      context: presentationContext,
       barrierDismissible: false,
       builder: (dialogCtx) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
+          scrollable: true,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
           ),
@@ -114,12 +117,12 @@ class _LoginScreenState extends State<LoginScreen> {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
+                  color: LoginDesign.forest.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
                   Icons.lock_reset_rounded,
-                  color: AppColors.primary,
+                  color: LoginDesign.forest,
                   size: 26,
                 ),
               ),
@@ -129,16 +132,16 @@ class _LoginScreenState extends State<LoginScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Lupa Password Admin?',
+                      'Lupa kata sandi?',
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: AppColors.primaryDark,
+                        color: LoginDesign.forestDark,
                       ),
                     ),
                     Text(
                       'Reset Kata Sandi Akun',
-                      style: TextStyle(fontSize: 12, color: AppColors.textGrey),
+                      style: TextStyle(fontSize: 12, color: LoginDesign.muted),
                     ),
                   ],
                 ),
@@ -157,7 +160,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     'Masukkan nama email admin terdaftar. Kami akan mengirimkan tautan untuk mengatur ulang kata sandi Anda.',
                     style: TextStyle(
                       fontSize: 13,
-                      color: AppColors.textDark,
+                      color: LoginDesign.ink,
                       height: 1.4,
                     ),
                   ),
@@ -166,18 +169,19 @@ class _LoginScreenState extends State<LoginScreen> {
                     controller: resetEmailController,
                     autofocus: true,
                     keyboardType: TextInputType.emailAddress,
-                    decoration: AppStyles.inputDecoration(
-                      'Nama Email Admin',
-                      Icons.email_outlined,
-                    ).copyWith(
-                      hintText: 'email',
-                      suffixText: '@gmail.com',
-                      suffixStyle: const TextStyle(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14,
-                      ),
-                    ),
+                    decoration:
+                        LoginDesign.accountField(
+                          'Nama Email Admin',
+                          Icons.email_outlined,
+                        ).copyWith(
+                          hintText: 'email',
+                          suffixText: '@gmail.com',
+                          suffixStyle: const TextStyle(
+                            color: LoginDesign.forest,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                          ),
+                        ),
                     validator: (val) {
                       if (val == null || val.trim().isEmpty) {
                         return 'Nama email wajib diisi';
@@ -189,20 +193,18 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ),
           ),
-          actionsPadding:
-              const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          actionsPadding: const EdgeInsets.symmetric(
+            horizontal: 24,
+            vertical: 16,
+          ),
           actions: [
             TextButton(
-              onPressed:
-                  isResetting ? null : () => Navigator.pop(dialogCtx),
-              child: const Text(
-                'Batal',
-                style: TextStyle(color: Colors.grey),
-              ),
+              onPressed: isResetting ? null : () => Navigator.pop(dialogCtx),
+              child: const Text('Batal', style: TextStyle(color: Colors.grey)),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
+                backgroundColor: LoginDesign.forest,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
@@ -222,15 +224,14 @@ class _LoginScreenState extends State<LoginScreen> {
                       final email = rawEmail.endsWith('@gmail.com')
                           ? rawEmail
                           : (rawEmail.contains('@')
-                              ? rawEmail
-                              : '$rawEmail@gmail.com');
+                                ? rawEmail
+                                : '$rawEmail@gmail.com');
                       try {
                         await Supabase.instance.client.auth
                             .resetPasswordForEmail(
-                          email,
-                          redirectTo:
-                              kIsWeb ? Uri.base.origin : null,
-                        );
+                              email,
+                              redirectTo: kIsWeb ? Uri.base.origin : null,
+                            );
 
                         if (!dialogCtx.mounted) return;
                         Navigator.pop(dialogCtx);
@@ -239,6 +240,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         showDialog(
                           context: context,
                           builder: (successCtx) => AlertDialog(
+                            scrollable: true,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(16),
                             ),
@@ -247,8 +249,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 Container(
                                   padding: const EdgeInsets.all(8),
                                   decoration: BoxDecoration(
-                                    color: Colors.green
-                                        .withValues(alpha: 0.1),
+                                    color: Colors.green.withValues(alpha: 0.1),
                                     shape: BoxShape.circle,
                                   ),
                                   child: const Icon(
@@ -268,22 +269,18 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                             content: Text(
                               'Tautan untuk mereset kata sandi telah dikirim ke $email.\n\nSilakan periksa kotak masuk (Inbox) atau folder Spam pada email Anda untuk melanjutkan.',
-                              style: const TextStyle(
-                                fontSize: 14,
-                                height: 1.5,
-                              ),
+                              style: const TextStyle(fontSize: 14, height: 1.5),
                             ),
                             actions: [
                               ElevatedButton(
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.primary,
+                                  backgroundColor: LoginDesign.forest,
                                   foregroundColor: Colors.white,
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                 ),
-                                onPressed: () =>
-                                    Navigator.pop(successCtx),
+                                onPressed: () => Navigator.pop(successCtx),
                                 child: const Text('Mengerti'),
                               ),
                             ],
@@ -311,7 +308,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     )
                   : const Text(
-                      'Kirim Link Reset',
+                      'Kirim tautan pemulihan',
                       style: TextStyle(fontWeight: FontWeight.bold),
                     ),
             ),
@@ -321,7 +318,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  void _showChangeEmailDialog() {
+  void _showChangeEmailDialog(BuildContext presentationContext) {
     final typedEmail = _emailController.text.trim();
     final initialOldEmail = typedEmail.isEmpty
         ? ''
@@ -335,10 +332,11 @@ class _LoginScreenState extends State<LoginScreen> {
     bool obscureCurrentPassword = true;
 
     showDialog(
-      context: context,
+      context: presentationContext,
       barrierDismissible: false,
       builder: (dialogCtx) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
+          scrollable: true,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
           ),
@@ -347,12 +345,12 @@ class _LoginScreenState extends State<LoginScreen> {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
+                  color: LoginDesign.forest.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
                   Icons.mark_email_unread_rounded,
-                  color: AppColors.primary,
+                  color: LoginDesign.forest,
                   size: 26,
                 ),
               ),
@@ -366,12 +364,12 @@ class _LoginScreenState extends State<LoginScreen> {
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: AppColors.primaryDark,
+                        color: LoginDesign.forestDark,
                       ),
                     ),
                     Text(
                       'Verifikasi akun & ubah alamat email',
-                      style: TextStyle(fontSize: 12, color: AppColors.textGrey),
+                      style: TextStyle(fontSize: 12, color: LoginDesign.muted),
                     ),
                   ],
                 ),
@@ -391,7 +389,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       'Masukkan email lengkap saat ini, password verifikasi, dan nama email baru Anda.',
                       style: TextStyle(
                         fontSize: 13,
-                        color: AppColors.textDark,
+                        color: LoginDesign.ink,
                         height: 1.4,
                       ),
                     ),
@@ -401,12 +399,10 @@ class _LoginScreenState extends State<LoginScreen> {
                     TextFormField(
                       controller: oldEmailController,
                       keyboardType: TextInputType.emailAddress,
-                      decoration: AppStyles.inputDecoration(
+                      decoration: LoginDesign.accountField(
                         'Email Saat Ini (Lengkap)',
                         Icons.email_outlined,
-                      ).copyWith(
-                        hintText: 'admin@contoh.com',
-                      ),
+                      ).copyWith(hintText: 'admin@contoh.com'),
                       validator: (val) {
                         if (val == null || val.trim().isEmpty) {
                           return 'Email saat ini wajib diisi';
@@ -423,22 +419,24 @@ class _LoginScreenState extends State<LoginScreen> {
                     TextFormField(
                       controller: passwordController,
                       obscureText: obscureCurrentPassword,
-                      decoration: AppStyles.inputDecoration(
-                        'Password Akun Admin',
-                        Icons.lock_outline,
-                      ).copyWith(
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            obscureCurrentPassword
-                                ? Icons.visibility_off
-                                : Icons.visibility,
-                            color: Colors.grey,
+                      decoration:
+                          LoginDesign.accountField(
+                            'Password Akun Admin',
+                            Icons.lock_outline,
+                          ).copyWith(
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                obscureCurrentPassword
+                                    ? Icons.visibility_off
+                                    : Icons.visibility,
+                                color: Colors.grey,
+                              ),
+                              onPressed: () => setDialogState(
+                                () => obscureCurrentPassword =
+                                    !obscureCurrentPassword,
+                              ),
+                            ),
                           ),
-                          onPressed: () => setDialogState(() =>
-                              obscureCurrentPassword =
-                                  !obscureCurrentPassword),
-                        ),
-                      ),
                       validator: (val) {
                         if (val == null || val.isEmpty) {
                           return 'Password wajib diisi untuk verifikasi';
@@ -452,18 +450,19 @@ class _LoginScreenState extends State<LoginScreen> {
                     TextFormField(
                       controller: newEmailController,
                       keyboardType: TextInputType.emailAddress,
-                      decoration: AppStyles.inputDecoration(
-                        'Nama Email Baru',
-                        Icons.alternate_email_rounded,
-                      ).copyWith(
-                        hintText: 'email_baru',
-                        suffixText: '@gmail.com',
-                        suffixStyle: const TextStyle(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 14,
-                        ),
-                      ),
+                      decoration:
+                          LoginDesign.accountField(
+                            'Nama Email Baru',
+                            Icons.alternate_email_rounded,
+                          ).copyWith(
+                            hintText: 'email_baru',
+                            suffixText: '@gmail.com',
+                            suffixStyle: const TextStyle(
+                              color: LoginDesign.forest,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                            ),
+                          ),
                       validator: (val) {
                         if (val == null || val.trim().isEmpty) {
                           return 'Nama email baru wajib diisi';
@@ -516,20 +515,18 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ),
           ),
-          actionsPadding:
-              const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          actionsPadding: const EdgeInsets.symmetric(
+            horizontal: 24,
+            vertical: 16,
+          ),
           actions: [
             TextButton(
-              onPressed:
-                  isSubmitting ? null : () => Navigator.pop(dialogCtx),
-              child: const Text(
-                'Batal',
-                style: TextStyle(color: Colors.grey),
-              ),
+              onPressed: isSubmitting ? null : () => Navigator.pop(dialogCtx),
+              child: const Text('Batal', style: TextStyle(color: Colors.grey)),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
+                backgroundColor: LoginDesign.forest,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
@@ -552,8 +549,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       final newFullEmail = rawNew.endsWith('@gmail.com')
                           ? rawNew
                           : (rawNew.contains('@')
-                              ? rawNew
-                              : '$rawNew@gmail.com');
+                                ? rawNew
+                                : '$rawNew@gmail.com');
 
                       // Gunakan isolated SupabaseClient agar tidak mengubah session global AuthGate (tidak langsung masuk ke dashboard)
                       final tempClient = SupabaseClient(
@@ -563,14 +560,16 @@ class _LoginScreenState extends State<LoginScreen> {
 
                       try {
                         // 1. Verifikasi kredensial saat ini dengan login pada client terisolasi
-                        final authRes = await tempClient.auth.signInWithPassword(
-                          email: oldFullEmail,
-                          password: password,
-                        );
+                        final authRes = await tempClient.auth
+                            .signInWithPassword(
+                              email: oldFullEmail,
+                              password: password,
+                            );
 
                         if (authRes.user == null) {
                           throw const AuthException(
-                              'Verifikasi gagal, email atau password salah.');
+                            'Verifikasi gagal, email atau password salah.',
+                          );
                         }
 
                         // 2. Ajukan penggantian email ke Supabase
@@ -591,6 +590,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         showDialog(
                           context: context,
                           builder: (successCtx) => AlertDialog(
+                            scrollable: true,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(16),
                             ),
@@ -599,8 +599,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 Container(
                                   padding: const EdgeInsets.all(8),
                                   decoration: BoxDecoration(
-                                    color: Colors.green
-                                        .withValues(alpha: 0.1),
+                                    color: Colors.green.withValues(alpha: 0.1),
                                     shape: BoxShape.circle,
                                   ),
                                   child: const Icon(
@@ -620,15 +619,12 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                             content: Text(
                               'Permintaan ganti email dari $oldFullEmail ke $newFullEmail berhasil diajukan.\n\nSilakan buka kotak masuk (Inbox) atau folder Spam pada email $newFullEmail untuk mengonfirmasi perubahan.\n\nSetelah dikonfirmasi, silakan login kembali menggunakan alamat email baru Anda.',
-                              style: const TextStyle(
-                                fontSize: 14,
-                                height: 1.5,
-                              ),
+                              style: const TextStyle(fontSize: 14, height: 1.5),
                             ),
                             actions: [
                               ElevatedButton(
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.primary,
+                                  backgroundColor: LoginDesign.forest,
                                   foregroundColor: Colors.white,
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(8),
@@ -637,10 +633,13 @@ class _LoginScreenState extends State<LoginScreen> {
                                 onPressed: () {
                                   Navigator.pop(successCtx);
                                   // Update input email di form login dengan nama email baru
-                                  _emailController.text = rawNew.replaceAll('@gmail.com', '');
+                                  _emailController.text = rawNew.replaceAll(
+                                    '@gmail.com',
+                                    '',
+                                  );
                                   _passwordController.clear();
                                 },
-                                child: const Text('Mengerti & Kembali ke Login'),
+                                child: const Text('Kembali ke login'),
                               ),
                             ],
                           ),
@@ -670,7 +669,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     )
                   : const Text(
-                      'Verifikasi & Ganti Email',
+                      'Verifikasi dan ganti email',
                       style: TextStyle(fontWeight: FontWeight.bold),
                     ),
             ),
@@ -681,285 +680,261 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
+  Widget build(BuildContext context) => Theme(
+    data: LoginDesign.theme(Theme.of(context)),
+    child: Builder(
+      builder: (context) => AcademicLoginShell(form: _buildLoginForm(context)),
+    ),
+  );
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: Stack(
-        alignment:
-            Alignment.topCenter, // Pastikan alignment stack ke tengah atas
+  Widget _buildLoginForm(BuildContext context) => AutofillGroup(
+    child: Form(
+      key: _formKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // 1. Background Header Biru (Layer Paling Bawah)
-          _buildTopBackground(),
-
-          // 2. Logo & Teks (Layer Tengah - Ditaruh DI ATAS Background)
-          _buildHeaderBranding(),
-
-          // 3. Form Card (Layer Paling Atas - Scrollable)
-          Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // PENTING: Spacer ini menggantikan tempat Logo yang dipindah ke atas
-                  // Agar Card Login tidak menutupi Logo/Header
-                  const SizedBox(height: 220),
-
-                  ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxWidth: size.width < 600 ? 400 : 450,
-                    ),
-                    child: Card(
-                      elevation: 8,
-                      shadowColor: Colors.black26,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(32.0),
-                        child: Form(
-                          key: _formKey,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Text(
-                                'Selamat Datang',
-                                style: TextStyle(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.primaryDark,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                              const SizedBox(height: 8),
-                              const Text(
-                                'Silahkan login untuk mengakses panel admin',
-                                style: TextStyle(color: AppColors.textGrey),
-                                textAlign: TextAlign.center,
-                              ),
-                              const SizedBox(height: 30),
-
-                              // Input Email dengan akhiran permanen @gmail.com
-                              TextFormField(
-                                controller: _emailController,
-                                focusNode: _emailFocus,
-                                decoration: AppStyles.inputDecoration(
-                                  'Nama Email',
-                                  Icons.email_outlined,
-                                ).copyWith(
-                                  hintText: 'email',
-                                  suffixText: '@gmail.com',
-                                  suffixStyle: const TextStyle(
-                                    color: AppColors.primary,
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                                keyboardType: TextInputType.emailAddress,
-                                textInputAction: TextInputAction.next,
-                                autofillHints: const [AutofillHints.username],
-                                onFieldSubmitted: (_) => FocusScope.of(
-                                  context,
-                                ).requestFocus(_passwordFocus),
-                                validator: (value) {
-                                  if (value == null || value.trim().isEmpty) {
-                                    return 'Nama email wajib diisi';
-                                  }
-                                  return null;
-                                },
-                              ),
-                              const SizedBox(height: 20),
-
-                              // Input Password
-                              TextFormField(
-                                controller: _passwordController,
-                                focusNode: _passwordFocus,
-                                obscureText: _obscurePassword,
-                                decoration:
-                                    AppStyles.inputDecoration(
-                                      'Password',
-                                      Icons.lock_outline,
-                                    ).copyWith(
-                                      suffixIcon: IconButton(
-                                        icon: Icon(
-                                          _obscurePassword
-                                              ? Icons.visibility_off
-                                              : Icons.visibility,
-                                          color: Colors.grey,
-                                        ),
-                                        onPressed: () => setState(
-                                          () => _obscurePassword =
-                                              !_obscurePassword,
-                                        ),
-                                      ),
-                                    ),
-                                textInputAction: TextInputAction.done,
-                                onFieldSubmitted: (_) => _handleLogin(),
-                                validator: (value) {
-                                  if (value == null || value.isEmpty) {
-                                    return 'Password wajib diisi';
-                                  }
-                                  if (value.length < 5) {
-                                    return 'Password minimal 5 karakter';
-                                  }
-                                  return null;
-                                },
-                              ),
-                              const SizedBox(height: 10),
-
-                              // Forgot Password & Change Email Links
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  TextButton.icon(
-                                    onPressed: _showChangeEmailDialog,
-                                    style: TextButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 4,
-                                        vertical: 2,
-                                      ),
-                                      minimumSize: Size.zero,
-                                      tapTargetSize:
-                                          MaterialTapTargetSize.shrinkWrap,
-                                    ),
-                                    icon: const Icon(
-                                      Icons.alternate_email_rounded,
-                                      size: 14,
-                                      color: AppColors.primary,
-                                    ),
-                                    label: const Text(
-                                      'Ganti Email?',
-                                      style: TextStyle(
-                                        color: AppColors.primary,
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-                                  TextButton(
-                                    onPressed: _showForgotPasswordDialog,
-                                    style: TextButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 4,
-                                        vertical: 2,
-                                      ),
-                                      minimumSize: Size.zero,
-                                      tapTargetSize:
-                                          MaterialTapTargetSize.shrinkWrap,
-                                    ),
-                                    child: const Text(
-                                      'Lupa Password?',
-                                      style: TextStyle(
-                                        color: AppColors.primary,
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 24),
-
-                              // Tombol Login
-                              SizedBox(
-                                height: 50,
-                                child: ElevatedButton(
-                                  style: AppStyles.buttonStyle,
-                                  onPressed: _isLoading ? null : _handleLogin,
-                                  child: _isLoading
-                                      ? const SizedBox(
-                                          height: 20,
-                                          width: 20,
-                                          child: CircularProgressIndicator(
-                                            color: Colors.white,
-                                            strokeWidth: 3,
-                                          ),
-                                        )
-                                      : const Text('MASUK'),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 50),
-                ],
+          Semantics(
+            header: true,
+            child: const Text(
+              'Masuk ke panel admin',
+              style: TextStyle(
+                fontFamily: LoginDesign.sans,
+                fontSize: 28,
+                fontWeight: FontWeight.w600,
+                height: 1.2,
+                letterSpacing: -0.6,
+                color: LoginDesign.ink,
               ),
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTopBackground() {
-    return Positioned(
-      top: 0,
-      left: 0,
-      right: 0,
-      height: 200, // Sedikit dipertinggi agar muat logo + teks
-      child: Container(
-        decoration: const BoxDecoration(
-          color: AppColors.primary,
-          borderRadius: BorderRadius.only(
-            bottomLeft: Radius.circular(40),
-            bottomRight: Radius.circular(100),
+          const SizedBox(height: 10),
+          const Text(
+            'Gunakan akun yang terdaftar untuk melanjutkan.',
+            style: TextStyle(
+              fontFamily: LoginDesign.sans,
+              fontSize: 14,
+              height: 1.6,
+              color: LoginDesign.muted,
+            ),
           ),
-        ),
-      ),
-    );
-  }
-
-  // UBAH INI JADI POSITIONED
-  Widget _buildHeaderBranding() {
-    return Positioned(
-      top: 30, // Jarak dari atas layar
-      left: 0,
-      right: 0,
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8), // Padding diperkecil sedikit
-            decoration: BoxDecoration(
-              color: Colors.white,
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black12,
-                  blurRadius: 10,
-                  offset: const Offset(0, 5),
+          const SizedBox(height: 32),
+          const Text(
+            'Email admin',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: LoginDesign.ink,
+            ),
+          ),
+          const SizedBox(height: 10),
+          ValueListenableBuilder<TextEditingValue>(
+            valueListenable: _emailController,
+            builder: (context, value, _) => Semantics(
+              label: 'Email admin',
+              child: TextFormField(
+                key: const ValueKey('login-email'),
+                controller: _emailController,
+                focusNode: _emailFocus,
+                enabled: !_isLoading,
+                style: const TextStyle(
+                  fontFamily: LoginDesign.sans,
+                  fontSize: 14,
+                  color: LoginDesign.ink,
                 ),
+                decoration: InputDecoration(
+                  hintText: 'nama.email',
+                  suffixIcon: value.text.contains('@')
+                      ? null
+                      : const Padding(
+                          padding: EdgeInsets.only(right: 16),
+                          child: Center(
+                            widthFactor: 1,
+                            child: Text(
+                              '@gmail.com',
+                              style: TextStyle(
+                                fontFamily: LoginDesign.sans,
+                                fontSize: 14,
+                                color: LoginDesign.muted,
+                              ),
+                            ),
+                          ),
+                        ),
+                  suffixIconConstraints: const BoxConstraints(minHeight: 48),
+                ),
+                keyboardType: TextInputType.emailAddress,
+                textInputAction: TextInputAction.next,
+                autofillHints: const [AutofillHints.username],
+                autocorrect: false,
+                onFieldSubmitted: (_) => _passwordFocus.requestFocus(),
+                validator: (value) => value == null || value.trim().isEmpty
+                    ? 'Email admin wajib diisi'
+                    : null,
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              const Text(
+                'Kata sandi',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: LoginDesign.ink,
+                ),
+              ),
+              TextButton(
+                onPressed: _isLoading
+                    ? null
+                    : () => _showForgotPasswordDialog(context),
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  minimumSize: const Size(44, 44),
+                  alignment: Alignment.centerRight,
+                ),
+                child: const Text('Lupa kata sandi?'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 2),
+          Semantics(
+            label: 'Kata sandi',
+            child: TextFormField(
+              key: const ValueKey('login-password'),
+              controller: _passwordController,
+              focusNode: _passwordFocus,
+              enabled: !_isLoading,
+              obscureText: _obscurePassword,
+              style: const TextStyle(
+                fontFamily: LoginDesign.sans,
+                fontSize: 14,
+                color: LoginDesign.ink,
+              ),
+              decoration: InputDecoration(
+                hintText: 'Masukkan kata sandi',
+                suffixIcon: IconButton(
+                  tooltip: _obscurePassword
+                      ? 'Tampilkan kata sandi'
+                      : 'Sembunyikan kata sandi',
+                  onPressed: _isLoading
+                      ? null
+                      : () => setState(
+                          () => _obscurePassword = !_obscurePassword,
+                        ),
+                  icon: Icon(
+                    _obscurePassword
+                        ? Icons.visibility_outlined
+                        : Icons.visibility_off_outlined,
+                    size: 20,
+                    color: LoginDesign.muted,
+                  ),
+                ),
+              ),
+              textInputAction: TextInputAction.done,
+              autofillHints: const [AutofillHints.password],
+              enableSuggestions: false,
+              autocorrect: false,
+              onFieldSubmitted: (_) => _handleLogin(),
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Kata sandi wajib diisi';
+                }
+                if (value.length < 5) return 'Kata sandi minimal 5 karakter';
+                return null;
+              },
+            ),
+          ),
+          const SizedBox(height: 26),
+          ElevatedButton(
+            key: const ValueKey('login-submit'),
+            onPressed: _isLoading ? null : _handleLogin,
+            style: ElevatedButton.styleFrom(
+              minimumSize: const Size.fromHeight(52),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              textStyle: const TextStyle(
+                fontFamily: LoginDesign.sans,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+              backgroundColor: LoginDesign.forest,
+              disabledBackgroundColor: LoginDesign.paper,
+              disabledForegroundColor: LoginDesign.ink,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (_isLoading) ...[
+                  const SizedBox(
+                    width: 17,
+                    height: 17,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: LoginDesign.forest,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                ],
+                Text(_isLoading ? 'Sedang masuk...' : 'Masuk ke panel'),
+                if (!_isLoading) ...[
+                  const SizedBox(width: 12),
+                  const Icon(Icons.arrow_forward_rounded, size: 18),
+                ],
               ],
             ),
-            // Pastikan aset logo ada
-            child: Image.asset('assets/Logo MTS.png', height: 80, width: 80),
           ),
-          const SizedBox(height: 12),
-          Text(
-            AppConstants.schoolName,
-            style: const TextStyle(
-              fontSize: 32,
-              fontWeight: FontWeight.w800,
-              color: Colors
-                  .white, // Warna Putih agar kontras dengan Background Biru
-              shadows: [
-                Shadow(
-                  offset: Offset(0, 2),
-                  blurRadius: 4,
-                  color: Colors.black26,
+          const SizedBox(height: 20),
+          const Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.lock_outline_rounded,
+                size: 14,
+                color: LoginDesign.muted,
+              ),
+              SizedBox(width: 7),
+              Flexible(
+                child: Text(
+                  'Akses khusus administrator madrasah.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontFamily: LoginDesign.sans,
+                    fontSize: 12,
+                    color: LoginDesign.muted,
+                    height: 1.5,
+                  ),
                 ),
-              ],
-              letterSpacing: 0.5,
-            ),
-            textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          Wrap(
+            alignment: WrapAlignment.center,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 6,
+            children: [
+              const Text(
+                'Perlu memperbarui akun?',
+                style: TextStyle(
+                  fontFamily: LoginDesign.sans,
+                  fontSize: 13,
+                  color: LoginDesign.muted,
+                ),
+              ),
+              TextButton(
+                onPressed: _isLoading
+                    ? null
+                    : () => _showChangeEmailDialog(context),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                ),
+                child: const Text('Ganti email'),
+              ),
+            ],
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
 }
