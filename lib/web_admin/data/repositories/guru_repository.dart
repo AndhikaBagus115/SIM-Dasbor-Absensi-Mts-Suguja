@@ -14,16 +14,16 @@ abstract class GuruRepository {
   });
 
   /// Get a single teacher by ID
-  Future<Guru?> getGuruById(int id);
+  Future<Guru?> getGuruById(String id);
 
   /// Create a new teacher
   Future<Guru> createGuru(Map<String, dynamic> data);
 
   /// Update an existing teacher
-  Future<Guru> updateGuru(int id, Map<String, dynamic> data);
+  Future<Guru> updateGuru(String id, Map<String, dynamic> data);
 
   /// Delete a teacher
-  Future<void> deleteGuru(int id);
+  Future<void> deleteGuru(String id);
 
   /// Get total count of teachers
   Future<int> getGuruCount();
@@ -47,7 +47,10 @@ class GuruRepositoryImpl implements GuruRepository {
     bool forceRefresh = false,
   }) async {
     try {
-      if (!forceRefresh && (searchQuery == null || searchQuery.isEmpty) && offset == 0 && _cachedGuru != null) {
+      if (!forceRefresh &&
+          (searchQuery == null || searchQuery.isEmpty) &&
+          offset == 0 &&
+          _cachedGuru != null) {
         return _cachedGuru!;
       }
 
@@ -88,7 +91,7 @@ class GuruRepositoryImpl implements GuruRepository {
   }
 
   @override
-  Future<Guru?> getGuruById(int id) async {
+  Future<Guru?> getGuruById(String id) async {
     try {
       final response = await _supabase
           .from(DbTables.guru)
@@ -146,7 +149,7 @@ class GuruRepositoryImpl implements GuruRepository {
   }
 
   @override
-  Future<Guru> updateGuru(int id, Map<String, dynamic> data) async {
+  Future<Guru> updateGuru(String id, Map<String, dynamic> data) async {
     try {
       _validateGuruData(data, isUpdate: true);
 
@@ -176,7 +179,7 @@ class GuruRepositoryImpl implements GuruRepository {
   }
 
   @override
-  Future<void> deleteGuru(int id) async {
+  Future<void> deleteGuru(String id) async {
     try {
       await _supabase
           .from(DbTables.guru)
@@ -205,7 +208,7 @@ class GuruRepositoryImpl implements GuruRepository {
       var query = _supabase.from(DbTables.guru).select('id');
 
       final response = await query.count(CountOption.exact);
-      
+
       return response.count;
     } catch (e) {
       return 0;
@@ -219,9 +222,11 @@ class GuruRepositoryImpl implements GuruRepository {
           .from(DbTables.guru)
           .stream(primaryKey: [GuruColumns.id])
           .order(GuruColumns.nama)
-          .map((response) => (response as List)
-              .map((json) => Guru.fromJson(json as Map<String, dynamic>))
-              .toList());
+          .map(
+            (response) => (response as List)
+                .map((json) => Guru.fromJson(json as Map<String, dynamic>))
+                .toList(),
+          );
     } catch (e) {
       return Stream.error(
         RepositoryException(
@@ -234,41 +239,15 @@ class GuruRepositoryImpl implements GuruRepository {
 
   /// Validate guru data before creating or updating
   void _validateGuruData(Map<String, dynamic> data, {bool isUpdate = false}) {
-    if (!isUpdate) {
-      final nip = data[GuruColumns.nip] as String?;
-      if (nip == null || nip.isEmpty) {
-        throw ValidationException(
-          message: 'NIP is required',
-          fieldErrors: {GuruColumns.nip: 'NIP cannot be empty'},
-        );
-      }
-
-      final nama = data[GuruColumns.nama] as String?;
-      if (nama == null || nama.isEmpty) {
-        throw ValidationException(
-          message: 'Name is required',
-          fieldErrors: {GuruColumns.nama: 'Name cannot be empty'},
-        );
-      }
-    }
-
-    if (data.containsKey(GuruColumns.nip)) {
-      final value = data[GuruColumns.nip] as String?;
-      if (value == null || value.isEmpty) {
-        throw ValidationException(
-          message: 'NIP cannot be empty',
-          fieldErrors: {GuruColumns.nip: 'NIP is required'},
-        );
-      }
-    }
-
-    if (data.containsKey(GuruColumns.nama)) {
-      final value = data[GuruColumns.nama] as String?;
-      if (value == null || value.isEmpty) {
-        throw ValidationException(
-          message: 'Name cannot be empty',
-          fieldErrors: {GuruColumns.nama: 'Name is required'},
-        );
+    for (final column in [GuruColumns.nama, GuruColumns.email]) {
+      if (!isUpdate || data.containsKey(column)) {
+        final value = data[column];
+        if (value is! String || value.trim().isEmpty) {
+          throw ValidationException(
+            message: '$column wajib diisi',
+            fieldErrors: {column: 'Wajib diisi'},
+          );
+        }
       }
     }
   }

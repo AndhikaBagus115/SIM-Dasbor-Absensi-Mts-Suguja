@@ -146,37 +146,32 @@ abstract class SiswaColumns {
   static const String nama = 'nama';
   static const String status = 'status';
   static const String kelasId = 'kelas_id';
-  static const String email = 'email';
-  static const String noHp = 'no_hp';
-  static const String alamat = 'alamat';
+  static const String orangTuaNama = 'orang_tua_nama';
+  static const String orangTuaNomor = 'orang_tua_nomor';
   static const String createdAt = 'created_at';
-  static const String updatedAt = 'updated_at';
 }
 
 // Database Column Names for Guru
 abstract class GuruColumns {
   static const String id = 'id';
-  static const String nip = 'nip';
+  static const String role = 'role';
+  static const String kelasDiampu = 'kelas_diampu';
+  static const String avatarUrl = 'avatar_url';
   static const String nama = 'nama';
   static const String email = 'email';
   static const String noHp = 'no_hp';
-  static const String status = 'status';
   static const String fotoUrl = 'foto_url';
   static const String createdAt = 'created_at';
-  static const String updatedAt = 'updated_at';
 }
 
 // Database Column Names for Kelas
 abstract class KelasColumns {
   static const String id = 'id';
   static const String namaKelas = 'nama_kelas';
-  static const String tingkat = 'tingkat';
-  static const String waliKelasId = 'wali_kelas_id';
-  static const String jumlahSiswa = 'jumlah_siswa';
+  static const String waliKelasId = 'wali_kelas';
   static const String jamMasuk = 'jam_masuk';
   static const String jamPulang = 'jam_pulang';
   static const String createdAt = 'created_at';
-  static const String updatedAt = 'updated_at';
 }
 
 // Database Column Names for Absensi
@@ -199,17 +194,20 @@ abstract class SuratColumns {
   static const String siswaId = 'siswa_id';
   static const String tipe = 'jenis';
   static const String tanggal = 'tanggal';
-  static const String alasan = 'alasan';
   static const String keterangan = 'keterangan';
   static const String createdAt = 'created_at';
-  static const String updatedAt = 'updated_at';
+  static const String tanggalSelesai = 'tanggal_selesai';
+  static const String fileUrl = 'file_url';
+  static const String status = 'status';
+  static const String catatanGuru = 'catatan_guru';
 }
 
 // Student Status Enum
 enum StudentStatus {
   aktif('aktif', 'Aktif'),
   lulus('lulus', 'Lulus'),
-  tidakAktif('tidak aktif', 'Tidak Aktif');
+  pindah('pindah', 'Pindah'),
+  keluar('keluar', 'Keluar');
 
   final String value;
   final String displayName;
@@ -291,7 +289,8 @@ abstract class StatusColors {
   static const Map<String, int> studentStatusColors = {
     'aktif': 0xFF4CAF50, // Green
     'lulus': 0xFF2196F3, // Blue
-    'tidak aktif': 0xFFFF5722, // Deep Orange
+    'pindah': 0xFFFF5722, // Deep Orange
+    'keluar': 0xFF757575, // Grey
   };
 }
 

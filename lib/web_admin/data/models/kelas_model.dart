@@ -1,97 +1,60 @@
-import 'package:web_admin_mts/web_admin/core/constants.dart';
+import '../../core/constants.dart';
 
-/// Model representing a class (Kelas)
 class Kelas {
   final int id;
   final String namaKelas;
-  final String tingkat;
-  final int? waliKelasId;
-  final int? jumlahSiswa;
-  final String? jamMasuk;
+  final String? waliKelasId;
+  final String jamMasuk;
   final String? jamPulang;
-  final DateTime createdAt;
-  final DateTime? updatedAt;
+  final DateTime? createdAt;
 
   Kelas({
     required this.id,
     required this.namaKelas,
-    required this.tingkat,
     this.waliKelasId,
-    this.jumlahSiswa,
-    this.jamMasuk,
+    this.jamMasuk = '07:00:00',
     this.jamPulang,
-    required this.createdAt,
-    this.updatedAt,
+    this.createdAt,
   });
 
-  /// Create Kelas from JSON (typically from Supabase)
-  factory Kelas.fromJson(Map<String, dynamic> json) {
-    return Kelas(
-      id: json[KelasColumns.id] as int,
-      namaKelas: json[KelasColumns.namaKelas] as String? ?? '',
-      tingkat: json[KelasColumns.tingkat] as String? ?? '',
-      waliKelasId: json[KelasColumns.waliKelasId] as int?,
-      jumlahSiswa: json[KelasColumns.jumlahSiswa] as int?,
-      jamMasuk: json[KelasColumns.jamMasuk] as String?,
-      jamPulang: json[KelasColumns.jamPulang] as String?,
-      createdAt: json[KelasColumns.createdAt] != null
-          ? DateTime.parse(json[KelasColumns.createdAt] as String)
-          : DateTime.now(),
-      updatedAt: json[KelasColumns.updatedAt] != null
-          ? DateTime.parse(json[KelasColumns.updatedAt] as String)
-          : null,
-    );
-  }
+  factory Kelas.fromJson(Map<String, dynamic> json) => Kelas(
+    id: json[KelasColumns.id] as int,
+    namaKelas: json[KelasColumns.namaKelas] as String,
+    waliKelasId: json[KelasColumns.waliKelasId] as String?,
+    jamMasuk: json[KelasColumns.jamMasuk] as String? ?? '07:00:00',
+    jamPulang: json[KelasColumns.jamPulang] as String?,
+    createdAt: DateTime.tryParse(
+      json[KelasColumns.createdAt]?.toString() ?? '',
+    ),
+  );
 
-  /// Convert Kelas to JSON for sending to Supabase
   Map<String, dynamic> toJson() => {
     KelasColumns.id: id,
     KelasColumns.namaKelas: namaKelas,
-    KelasColumns.tingkat: tingkat,
     KelasColumns.waliKelasId: waliKelasId,
-    KelasColumns.jumlahSiswa: jumlahSiswa,
     KelasColumns.jamMasuk: jamMasuk,
     KelasColumns.jamPulang: jamPulang,
-    KelasColumns.createdAt: createdAt.toIso8601String(),
-    KelasColumns.updatedAt: updatedAt?.toIso8601String(),
+    if (createdAt != null) KelasColumns.createdAt: createdAt!.toIso8601String(),
   };
 
-  /// Create a copy of this Kelas with some fields replaced
   Kelas copyWith({
     int? id,
     String? namaKelas,
-    String? tingkat,
-    int? waliKelasId,
-    int? jumlahSiswa,
+    String? waliKelasId,
     String? jamMasuk,
     String? jamPulang,
     DateTime? createdAt,
-    DateTime? updatedAt,
-  }) {
-    return Kelas(
-      id: id ?? this.id,
-      namaKelas: namaKelas ?? this.namaKelas,
-      tingkat: tingkat ?? this.tingkat,
-      waliKelasId: waliKelasId ?? this.waliKelasId,
-      jumlahSiswa: jumlahSiswa ?? this.jumlahSiswa,
-      jamMasuk: jamMasuk ?? this.jamMasuk,
-      jamPulang: jamPulang ?? this.jamPulang,
-      createdAt: createdAt ?? this.createdAt,
-      updatedAt: updatedAt ?? this.updatedAt,
-    );
-  }
+  }) => Kelas(
+    id: id ?? this.id,
+    namaKelas: namaKelas ?? this.namaKelas,
+    waliKelasId: waliKelasId ?? this.waliKelasId,
+    jamMasuk: jamMasuk ?? this.jamMasuk,
+    jamPulang: jamPulang ?? this.jamPulang,
+    createdAt: createdAt ?? this.createdAt,
+  );
 
   @override
-  String toString() => 'Kelas(id: $id, namaKelas: $namaKelas, tingkat: $tingkat)';
-
+  bool operator ==(Object other) => other is Kelas && other.id == id;
   @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is Kelas &&
-          runtimeType == other.runtimeType &&
-          id == other.id &&
-          namaKelas == other.namaKelas;
-
-  @override
-  int get hashCode => id.hashCode ^ namaKelas.hashCode;
+  int get hashCode => id.hashCode;
 }
