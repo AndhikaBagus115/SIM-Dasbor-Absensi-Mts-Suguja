@@ -3,7 +3,7 @@ import 'package:web_admin_mts/web_admin/core/constants.dart';
 /// Model representing attendance record (Absensi)
 class Absensi {
   final int id;
-  final int siswaId;
+  final int? siswaId;
   final DateTime tanggal;
   final AttendanceStatus status;
   final String? keterangan;
@@ -30,7 +30,7 @@ class Absensi {
   factory Absensi.fromJson(Map<String, dynamic> json) {
     return Absensi(
       id: json[AbsensiColumns.id] as int,
-      siswaId: json[AbsensiColumns.siswaId] as int,
+      siswaId: json[AbsensiColumns.siswaId] as int?,
       tanggal: json[AbsensiColumns.tanggal] != null
           ? DateTime.parse(json[AbsensiColumns.tanggal] as String)
           : DateTime.now(),
@@ -92,7 +92,8 @@ class Absensi {
   }
 
   @override
-  String toString() => 'Absensi(id: $id, siswaId: $siswaId, status: ${status.value}, tanggal: $tanggal)';
+  String toString() =>
+      'Absensi(id: $id, siswaId: $siswaId, status: ${status.value}, tanggal: $tanggal)';
 
   @override
   bool operator ==(Object other) =>
@@ -106,5 +107,6 @@ class Absensi {
           tanggal.day == (other.tanggal).day;
 
   @override
-  int get hashCode => id.hashCode ^ siswaId.hashCode ^ tanggal.hashCode;
+  int get hashCode =>
+      Object.hash(id, siswaId, tanggal.year, tanggal.month, tanggal.day);
 }

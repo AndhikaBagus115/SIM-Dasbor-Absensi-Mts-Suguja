@@ -47,7 +47,10 @@ class KelasRepositoryImpl implements KelasRepository {
     bool forceRefresh = false,
   }) async {
     try {
-      if (!forceRefresh && (searchQuery == null || searchQuery.isEmpty) && offset == 0 && _cachedKelas != null) {
+      if (!forceRefresh &&
+          (searchQuery == null || searchQuery.isEmpty) &&
+          offset == 0 &&
+          _cachedKelas != null) {
         return _cachedKelas!;
       }
 
@@ -178,10 +181,7 @@ class KelasRepositoryImpl implements KelasRepository {
   @override
   Future<void> deleteKelas(int id) async {
     try {
-      await _supabase
-          .from(DbTables.kelas)
-          .delete()
-          .eq(KelasColumns.id, id);
+      await _supabase.from(DbTables.kelas).delete().eq(KelasColumns.id, id);
       _cachedKelas = null;
       MasterDataCacheService.instance.invalidateKelas();
     } on PostgrestException catch (e) {
@@ -205,7 +205,7 @@ class KelasRepositoryImpl implements KelasRepository {
       var query = _supabase.from(DbTables.kelas).select('id');
 
       final response = await query.count(CountOption.exact);
-      
+
       return response.count;
     } catch (e) {
       return 0;
@@ -219,9 +219,11 @@ class KelasRepositoryImpl implements KelasRepository {
           .from(DbTables.kelas)
           .stream(primaryKey: [KelasColumns.id])
           .order(KelasColumns.namaKelas)
-          .map((response) => (response as List)
-              .map((json) => Kelas.fromJson(json as Map<String, dynamic>))
-              .toList());
+          .map(
+            (response) => (response as List)
+                .map((json) => Kelas.fromJson(json as Map<String, dynamic>))
+                .toList(),
+          );
     } catch (e) {
       return Stream.error(
         RepositoryException(
@@ -242,14 +244,6 @@ class KelasRepositoryImpl implements KelasRepository {
           fieldErrors: {KelasColumns.namaKelas: 'Class name cannot be empty'},
         );
       }
-
-      final tingkat = data[KelasColumns.tingkat] as String?;
-      if (tingkat == null || tingkat.isEmpty) {
-        throw ValidationException(
-          message: 'Level is required',
-          fieldErrors: {KelasColumns.tingkat: 'Level cannot be empty'},
-        );
-      }
     }
 
     if (data.containsKey(KelasColumns.namaKelas)) {
@@ -258,16 +252,6 @@ class KelasRepositoryImpl implements KelasRepository {
         throw ValidationException(
           message: 'Class name cannot be empty',
           fieldErrors: {KelasColumns.namaKelas: 'Class name is required'},
-        );
-      }
-    }
-
-    if (data.containsKey(KelasColumns.tingkat)) {
-      final value = data[KelasColumns.tingkat] as String?;
-      if (value == null || value.isEmpty) {
-        throw ValidationException(
-          message: 'Level cannot be empty',
-          fieldErrors: {KelasColumns.tingkat: 'Level is required'},
         );
       }
     }

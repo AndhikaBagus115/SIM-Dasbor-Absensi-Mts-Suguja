@@ -1,9 +1,8 @@
-import 'dart:convert';
-import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../constants.dart';
+import '../../data/repositories/attendance_notification_repository.dart';
 import 'logging_service.dart';
 import 'onesignal_service.dart';
+import 'admin_notification_gateway.dart';
 
 /// Notification Channel Mode
 enum NotificationChannel {
@@ -24,21 +23,6 @@ enum NotificationType {
 
   final String displayName;
   const NotificationType(this.displayName);
-}
-
-/// WAHA (WhatsApp HTTP API) Configuration
-class WahaConfig {
-  /// Base URL for WAHA API (retrieved dynamically from environment)
-  static String get baseUrl => AppConstants.wahaBaseUrl;
-
-  /// Session name for WAHA
-  static String get session => AppConstants.wahaSession;
-
-  /// Endpoint for sending text messages
-  static const String sendTextEndpoint = '/api/sendText';
-
-  /// API Key for WAHA authentication (retrieved dynamically from environment)
-  static String get apiKey => AppConstants.wahaApiKey;
 }
 
 /// Model for parent notification
@@ -115,97 +99,46 @@ class ParentNotification {
 class NotificationService {
   static final SupabaseClient _supabase = Supabase.instance.client;
 
-  /// Check if WAHA configuration is present
   static bool get isWahaConfigured =>
-      WahaConfig.baseUrl.trim().isNotEmpty &&
-      WahaConfig.session.trim().isNotEmpty;
+      AdminNotificationGateway.whatsappConfigured;
 
-  // ============================================================
-  // WHATSAPP HELPERS
-  // ============================================================
-
-  /// Format phone number for WhatsApp (WAHA format)
-  /// Converts Indonesian phone numbers to WhatsApp chatId format
-  /// Example: 08123456789 -> 628123456789@c.us
-  static String _formatPhoneNumberForWhatsApp(String phoneNumber) {
-    String cleaned = phoneNumber.replaceAll(RegExp(r'[^\d]'), '');
-
-    if (cleaned.startsWith('0')) {
-      cleaned = '62${cleaned.substring(1)}';
-    } else if (cleaned.startsWith('8')) {
-      cleaned = '62$cleaned';
-    } else if (!cleaned.startsWith('62')) {
-      cleaned = '62$cleaned';
-    }
-
-    return '$cleaned@c.us';
-  }
-
-  /// Send WhatsApp message via WAHA API
   static Future<bool> _sendWhatsAppMessage({
     required String phoneNumber,
     required String message,
   }) async {
     try {
-      final chatId = _formatPhoneNumberForWhatsApp(phoneNumber);
-      final url = Uri.parse('${WahaConfig.baseUrl}${WahaConfig.sendTextEndpoint}');
-
-      log.info(
-        'Sending WhatsApp message to: $chatId',
-        tag: 'NotificationService',
-      );
-
-      final headers = <String, String>{
-        'Content-Type': 'application/json',
-      };
-
-      if (WahaConfig.apiKey.isNotEmpty) {
-        headers['X-Api-Key'] = WahaConfig.apiKey;
-      }
-
-      final response = await http.post(
-        url,
-        headers: headers,
-        body: jsonEncode({
-          'chatId': chatId,
-          'text': message,
-          'session': WahaConfig.session,
-        }),
-      );
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        log.info(
-          'WhatsApp message sent successfully to: $chatId',
-          tag: 'NotificationService',
-        );
-        return true;
-      } else {
-        log.error(
-          'Failed to send WhatsApp message. Status: ${response.statusCode}, Body: ${response.body}',
-          tag: 'NotificationService',
-        );
-        return false;
-      }
-    } catch (e, stackTrace) {
-      log.error(
-        'Error sending WhatsApp message',
-        error: e,
-        stackTrace: stackTrace,
-        tag: 'NotificationService',
-      );
+      final result = await AdminNotificationGateway.call({
+        'action': 'whatsapp-test',
+        'phone': phoneNumber,
+        'message': message,
+      });
+      return result['success'] == true;
+    } catch (_) {
       return false;
     }
   }
+
+  static Future<Map<String, dynamic>> sendPengumumanWhatsApp({
+    required String targetTipe,
+    int? siswaId,
+    int? kelasId,
+    required String message,
+  }) => AdminNotificationGateway.call({
+    'action': 'whatsapp',
+    'message': message,
+    'target': {
+      'type': targetTipe,
+      if (targetTipe == 'siswa') 'id': siswaId,
+      if (targetTipe == 'kelas') 'id': kelasId,
+    },
+  });
 
   /// Public method to send a direct WhatsApp message
   static Future<bool> sendDirectWhatsApp({
     required String phoneNumber,
     required String message,
   }) async {
-    return _sendWhatsAppMessage(
-      phoneNumber: phoneNumber,
-      message: message,
-    );
+    return _sendWhatsAppMessage(phoneNumber: phoneNumber, message: message);
   }
 
   // ============================================================
@@ -229,7 +162,8 @@ class NotificationService {
     bool pushSuccess = false;
 
     // 1. Send via WhatsApp if selected
-    if (channel == NotificationChannel.whatsapp || channel == NotificationChannel.both) {
+    if (channel == NotificationChannel.whatsapp ||
+        channel == NotificationChannel.both) {
       if (parentPhoneNumber.isNotEmpty) {
         final message = _buildNotificationMessage(
           studentName: studentName,
@@ -253,7 +187,8 @@ class NotificationService {
     }
 
     // 2. Send via OneSignal Push Notification if selected
-    if (channel == NotificationChannel.onesignal || channel == NotificationChannel.both) {
+    if (channel == NotificationChannel.onesignal ||
+        channel == NotificationChannel.both) {
       final pushTitle = _buildPushTitle(
         type: type,
         studentName: studentName,
@@ -284,19 +219,11 @@ class NotificationService {
         );
         pushSuccess = pushResult.success;
       } else {
-        // Broadcast push if no specific siswaId is provided
-        final pushResult = await OneSignalService.sendBroadcastPush(
-          title: pushTitle,
-          message: pushBody,
-          data: {
-            'type': type.name,
-            'school_name': schoolName,
-            'student_name': studentName,
-            if (customMessage != null) 'custom_message': customMessage,
-            if (alasan != null) 'alasan': alasan,
-          },
+        log.warning(
+          'Pilih siswa tujuan untuk notifikasi presensi.',
+          tag: 'NotificationService',
         );
-        pushSuccess = pushResult.success;
+        pushSuccess = false;
       }
     }
 
@@ -341,11 +268,15 @@ class NotificationService {
   // ============================================================
 
   /// Get student data from database
-  static Future<Map<String, dynamic>?> _getStudentWithParentPhone(int siswaId) async {
+  static Future<Map<String, dynamic>?> _getStudentWithParentPhone(
+    int siswaId,
+  ) async {
     try {
       final response = await _supabase
           .from('siswa')
-          .select('id, nis, nama, orang_tua_nama, orang_tua_nomor, kelas(nama_kelas)')
+          .select(
+            'id, nis, nama, orang_tua_nama, orang_tua_nomor, kelas(nama_kelas)',
+          )
           .eq('id', siswaId)
           .single();
 
@@ -493,14 +424,12 @@ class NotificationService {
     try {
       final today = DateTime.now().toIso8601String().split('T')[0];
 
-      final absentRecords = await _supabase
-          .from('absensi')
-          .select('siswa_id, siswa(id, nis, nama, orang_tua_nomor)')
-          .eq('tanggal', today)
-          .eq('status', 'alpa');
+      final absentRecords = await AttendanceNotificationRepository(
+        _supabase,
+      ).absentOn(today);
 
       log.info(
-        'Found ${(absentRecords as List).length} absent students today. Sending via ${channel.displayName}',
+        'Found ${absentRecords.length} absent students today. Sending via ${channel.displayName}',
         tag: 'NotificationService',
       );
 
@@ -582,10 +511,7 @@ class NotificationService {
         await Future.delayed(const Duration(milliseconds: 200));
       }
 
-      log.info(
-        'Batch notifications completed',
-        tag: 'NotificationService',
-      );
+      log.info('Batch notifications completed', tag: 'NotificationService');
     } catch (e, stackTrace) {
       log.error(
         'Error sending batch notifications',
@@ -652,7 +578,8 @@ Waktu: ${DateTime.now().toString().split('.')[0]}''',
       final studentData = await _getStudentWithParentPhone(siswaId);
 
       if (studentData == null) {
-        result['message'] = 'Siswa dengan ID $siswaId tidak ditemukan di database';
+        result['message'] =
+            'Siswa dengan ID $siswaId tidak ditemukan di database';
         log.error(result['message'] as String, tag: 'NotificationService');
         return result;
       }
@@ -666,7 +593,8 @@ Waktu: ${DateTime.now().toString().split('.')[0]}''',
       final logDetails = <String>[];
 
       // 2. Dispatch based on channel
-      if (channel == NotificationChannel.whatsapp || channel == NotificationChannel.both) {
+      if (channel == NotificationChannel.whatsapp ||
+          channel == NotificationChannel.both) {
         if (parentPhone.isNotEmpty) {
           final message = _buildNotificationMessage(
             studentName: studentName,
@@ -681,13 +609,18 @@ Waktu: ${DateTime.now().toString().split('.')[0]}''',
             message: message,
           );
           result['waSuccess'] = waOk;
-          logDetails.add(waOk ? 'WhatsApp: Terkirim ke $parentPhone' : 'WhatsApp: Gagal kirim');
+          logDetails.add(
+            waOk
+                ? 'WhatsApp: Terkirim ke $parentPhone'
+                : 'WhatsApp: Gagal kirim',
+          );
         } else {
           logDetails.add('WhatsApp: Nomor orang tua kosong');
         }
       }
 
-      if (channel == NotificationChannel.onesignal || channel == NotificationChannel.both) {
+      if (channel == NotificationChannel.onesignal ||
+          channel == NotificationChannel.both) {
         final pushTitle = _buildPushTitle(
           type: type,
           studentName: studentName,
@@ -722,8 +655,11 @@ Waktu: ${DateTime.now().toString().split('.')[0]}''',
 
       result['details'] = logDetails;
 
-      final isOverallSuccess = (channel == NotificationChannel.whatsapp && result['waSuccess'] == true) ||
-          (channel == NotificationChannel.onesignal && result['pushSuccess'] == true) ||
+      final isOverallSuccess =
+          (channel == NotificationChannel.whatsapp &&
+              result['waSuccess'] == true) ||
+          (channel == NotificationChannel.onesignal &&
+              result['pushSuccess'] == true) ||
           (channel == NotificationChannel.both &&
               (result['waSuccess'] == true || result['pushSuccess'] == true));
 
@@ -758,7 +694,10 @@ Waktu: ${DateTime.now().toString().split('.')[0]}''',
 
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
-      log.error('Failed to get students with phone numbers: $e', tag: 'NotificationService');
+      log.error(
+        'Failed to get students with phone numbers: $e',
+        tag: 'NotificationService',
+      );
       return [];
     }
   }

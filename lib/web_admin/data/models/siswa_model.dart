@@ -7,11 +7,9 @@ class Siswa {
   final String nama;
   final StudentStatus status;
   final String? kelasId;
-  final String? email;
-  final String? noHp;
-  final String? alamat;
+  final String? orangTuaNama;
+  final String? orangTuaNomor;
   final DateTime createdAt;
-  final DateTime? updatedAt;
 
   Siswa({
     required this.id,
@@ -19,11 +17,9 @@ class Siswa {
     required this.nama,
     required this.status,
     this.kelasId,
-    this.email,
-    this.noHp,
-    this.alamat,
+    this.orangTuaNama,
+    this.orangTuaNomor,
     required this.createdAt,
-    this.updatedAt,
   });
 
   /// Create Siswa from JSON (typically from Supabase)
@@ -36,15 +32,11 @@ class Siswa {
         json[SiswaColumns.status] as String? ?? 'aktif',
       ),
       kelasId: json[SiswaColumns.kelasId]?.toString(),
-      email: json[SiswaColumns.email] as String?,
-      noHp: json[SiswaColumns.noHp] as String?,
-      alamat: json[SiswaColumns.alamat] as String?,
+      orangTuaNama: json[SiswaColumns.orangTuaNama] as String?,
+      orangTuaNomor: json[SiswaColumns.orangTuaNomor] as String?,
       createdAt: json[SiswaColumns.createdAt] != null
           ? DateTime.parse(json[SiswaColumns.createdAt] as String)
           : DateTime.now(),
-      updatedAt: json[SiswaColumns.updatedAt] != null
-          ? DateTime.parse(json[SiswaColumns.updatedAt] as String)
-          : null,
     );
   }
 
@@ -54,12 +46,10 @@ class Siswa {
     SiswaColumns.nis: nis,
     SiswaColumns.nama: nama,
     SiswaColumns.status: status.value,
-    SiswaColumns.kelasId: kelasId,
-    SiswaColumns.email: email,
-    SiswaColumns.noHp: noHp,
-    SiswaColumns.alamat: alamat,
+    SiswaColumns.kelasId: kelasId == null ? null : int.parse(kelasId!),
+    SiswaColumns.orangTuaNama: orangTuaNama,
+    SiswaColumns.orangTuaNomor: orangTuaNomor,
     SiswaColumns.createdAt: createdAt.toIso8601String(),
-    SiswaColumns.updatedAt: updatedAt?.toIso8601String(),
   };
 
   /// Create a copy of this Siswa with some fields replaced
@@ -69,11 +59,9 @@ class Siswa {
     String? nama,
     StudentStatus? status,
     String? kelasId,
-    String? email,
-    String? noHp,
-    String? alamat,
+    String? orangTuaNama,
+    String? orangTuaNomor,
     DateTime? createdAt,
-    DateTime? updatedAt,
   }) {
     return Siswa(
       id: id ?? this.id,
@@ -81,11 +69,9 @@ class Siswa {
       nama: nama ?? this.nama,
       status: status ?? this.status,
       kelasId: kelasId ?? this.kelasId,
-      email: email ?? this.email,
-      noHp: noHp ?? this.noHp,
-      alamat: alamat ?? this.alamat,
+      orangTuaNama: orangTuaNama ?? this.orangTuaNama,
+      orangTuaNomor: orangTuaNomor ?? this.orangTuaNomor,
       createdAt: createdAt ?? this.createdAt,
-      updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 

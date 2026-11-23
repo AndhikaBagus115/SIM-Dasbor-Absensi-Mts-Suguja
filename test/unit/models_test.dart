@@ -11,52 +11,47 @@ void main() {
       final json = {
         'id': 1,
         'nama_kelas': 'Kelas 7A',
-        'tingkat': '7',
         'jam_masuk': '07:00',
         'jam_pulang': '13:00',
-        'wali_kelas_id': 10,
+        'wali_kelas': '55b1344c-7471-4e71-a767-3cd59e02ed7c',
         'jumlah_siswa': 30,
       };
 
       final kelas = Kelas.fromJson(json);
       expect(kelas.id, 1);
       expect(kelas.namaKelas, 'Kelas 7A');
-      expect(kelas.tingkat, '7');
       expect(kelas.jamMasuk, '07:00');
       expect(kelas.jamPulang, '13:00');
-      expect(kelas.waliKelasId, 10);
-      expect(kelas.jumlahSiswa, 30);
+      expect(kelas.waliKelasId, '55b1344c-7471-4e71-a767-3cd59e02ed7c');
 
       final serialized = kelas.toJson();
       expect(serialized['id'], 1);
       expect(serialized['nama_kelas'], 'Kelas 7A');
-      expect(serialized['tingkat'], '7');
+      expect(serialized, isNot(contains('tingkat')));
     });
   });
 
   group('Guru Model Tests', () {
     test('Guru fromJson and toJson works correctly', () {
       final json = {
-        'id': 1,
-        'nip': '198001012005011001',
+        'id': '55b1344c-7471-4e71-a767-3cd59e02ed7c',
         'nama': 'Ust. Ahmad Fauzi',
         'email': 'ahmad@mts.sch.id',
         'no_hp': '081234567890',
-        'status': 'aktif',
+        'role': 'guru',
         'foto_url': 'https://example.com/avatar.jpg',
       };
 
       final guru = Guru.fromJson(json);
-      expect(guru.id, 1);
-      expect(guru.nip, '198001012005011001');
+      expect(guru.id, '55b1344c-7471-4e71-a767-3cd59e02ed7c');
       expect(guru.nama, 'Ust. Ahmad Fauzi');
       expect(guru.email, 'ahmad@mts.sch.id');
       expect(guru.noHp, '081234567890');
-      expect(guru.status, 'aktif');
+      expect(guru.role, 'guru');
       expect(guru.fotoUrl, 'https://example.com/avatar.jpg');
 
       final serialized = guru.toJson();
-      expect(serialized['id'], 1);
+      expect(serialized['id'], '55b1344c-7471-4e71-a767-3cd59e02ed7c');
       expect(serialized['nama'], 'Ust. Ahmad Fauzi');
     });
   });
@@ -75,7 +70,7 @@ void main() {
         'nama': 'Muhammad Rizki',
         'kelas_id': '1',
         'status': 'aktif',
-        'no_hp': '08123456789',
+        'orang_tua_nomor': '08123456789',
       };
 
       final siswa = Siswa.fromJson(json);
@@ -84,7 +79,7 @@ void main() {
       expect(siswa.nama, 'Muhammad Rizki');
       expect(siswa.kelasId, '1');
       expect(siswa.status, StudentStatus.aktif);
-      expect(siswa.noHp, '08123456789');
+      expect(siswa.orangTuaNomor, '08123456789');
 
       final serialized = siswa.toJson();
       expect(serialized['nis'], '2026001');

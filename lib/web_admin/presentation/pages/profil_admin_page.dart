@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/constants.dart';
+import '../../core/services/admin_notification_gateway.dart';
 import '../../core/theme.dart';
 
 class ProfilAdminPage extends StatefulWidget {
@@ -1438,18 +1439,18 @@ class _ProfilAdminPageState extends State<ProfilAdminPage> {
             const SizedBox(height: 12),
             _buildSystemRow(
               'WAHA WhatsApp',
-              AppConstants.isWahaConfigured ? 'Aktif' : 'Belum Dikonfigurasi',
+              AdminNotificationGateway.whatsappConfigured ? 'Aktif' : 'Belum Dikonfigurasi',
               statusColor:
-                  AppConstants.isWahaConfigured ? Colors.green : Colors.orange,
+                  AdminNotificationGateway.whatsappConfigured ? Colors.green : Colors.orange,
               icon: Icons.chat_rounded,
             ),
             const SizedBox(height: 12),
             _buildSystemRow(
               'OneSignal Push',
-              AppConstants.isOneSignalConfigured
+              AdminNotificationGateway.onesignalConfigured
                   ? 'Aktif'
                   : 'Belum Dikonfigurasi',
-              statusColor: AppConstants.isOneSignalConfigured
+              statusColor: AdminNotificationGateway.onesignalConfigured
                   ? Colors.green
                   : Colors.orange,
               icon: Icons.notifications_active_rounded,

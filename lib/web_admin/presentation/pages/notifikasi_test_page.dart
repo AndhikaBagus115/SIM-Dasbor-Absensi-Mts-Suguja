@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../core/constants.dart';
 import '../../core/services/master_data_cache_service.dart';
 import '../../core/services/notification_service.dart';
 import '../../core/services/onesignal_service.dart';
@@ -316,9 +315,6 @@ class _NotifikasiTestPageState extends State<NotifikasiTestPage>
       );
       return;
     }
-    final students = target == 'siswa'
-        ? [student!]
-        : _kelasSiswaList.map(Map<String, dynamic>.from).toList();
     final targetId = target == 'kelas'
         ? kelasId?.toString()
         : target == 'siswa'
@@ -338,9 +334,6 @@ class _NotifikasiTestPageState extends State<NotifikasiTestPage>
           targetTipe: target,
           siswaId: target == 'siswa' ? student!['id'] as int : null,
           kelasId: target == 'kelas' ? kelasId : null,
-          studentExternalIds: students
-              .map((row) => row['id'].toString())
-              .toList(),
         );
         _addLog('[OneSignal] ${result.message}');
         return result.partial
@@ -352,45 +345,28 @@ class _NotifikasiTestPageState extends State<NotifikasiTestPage>
     }
     if (channel != NotificationChannel.onesignal) {
       channels['WhatsApp'] = () async {
-        var failures = 0;
-        var sent = 0;
-        final phones = <String>{};
-        for (final row in students) {
-          final phone = (row['orang_tua_nomor'] as String? ?? '').trim();
-          if (phone.isEmpty) {
-            failures++;
-            continue;
-          }
-          if (!phones.add(phone)) continue;
-          final ok = await NotificationService.sendDirectWhatsApp(
-            phoneNumber: phone,
-            message:
-                'Pengumuman ${widget.schoolName}\n$judul\nTujuan: $targetNama\n\n$isi',
-          );
-          if (ok) {
-            sent++;
-          } else {
-            failures++;
-          }
-        }
-        _addLog(
-          '[WhatsApp] $sent nomor berhasil; $failures penerima gagal atau tidak memiliki nomor.',
+        final result = await NotificationService.sendPengumumanWhatsApp(
+          targetTipe: target,
+          siswaId: target == 'siswa' ? student!['id'] as int : null,
+          kelasId: kelasId,
+          message:
+              'Pengumuman ${widget.schoolName}\n$judul\nTujuan: $targetNama\n\n$isi',
         );
-        return sent == 0
-            ? DeliveryOutcome.failed
-            : failures == 0
+        _addLog(
+          '[WhatsApp] ${result['accepted'] ?? 0} nomor diterima; ${result['failed'] ?? 0} gagal.',
+        );
+        return result['partial'] == true
+            ? DeliveryOutcome.partial
+            : result['success'] == true
             ? DeliveryOutcome.accepted
-            : DeliveryOutcome.partial;
+            : DeliveryOutcome.failed;
       };
     }
     FocusScope.of(context).unfocus();
     setState(() => _isSendingPengumuman = true);
     try {
       if (target == 'kelas') {
-        final fresh = await _recipients.snapshotForSend(kelasId!);
-        students
-          ..clear()
-          ..addAll(fresh);
+        await _recipients.snapshotForSend(kelasId!);
       }
       final result = await _sender.send(
         record: {
@@ -517,20 +493,6 @@ class _NotifikasiTestPageState extends State<NotifikasiTestPage>
 
   Future<void> _testOneSignalConnection() async {
     _addLog('[DIAGNOSTIK] Memeriksa status konfigurasi OneSignal REST API...');
-    final isConfigured = OneSignalService.isConfigured;
-    _addLog('[CONFIG] OneSignal App ID: ${AppConstants.onesignalAppId}');
-    _addLog(
-      '[CONFIG] REST API Key: ${AppConstants.onesignalRestApiKey.isNotEmpty ? "Tersedia (${AppConstants.onesignalRestApiKey.length} karakter)" : "KOSONG"}',
-    );
-
-    if (!isConfigured) {
-      _addLog(
-        '[PERINGATAN] OneSignal belum terkonfigurasi lengkap di constants.dart!',
-      );
-      _showSnackbar('OneSignal belum lengkap dikonfigurasi', isError: true);
-      return;
-    }
-
     setState(() => _isLoading = true);
     try {
       final ok = await OneSignalService.verifyConnection();

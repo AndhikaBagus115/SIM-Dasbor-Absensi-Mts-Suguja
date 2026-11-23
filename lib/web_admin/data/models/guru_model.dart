@@ -1,97 +1,77 @@
-import 'package:web_admin_mts/web_admin/core/constants.dart';
+import '../../core/constants.dart';
 
-/// Model representing a teacher (Guru)
+/// Teacher IDs are the UUIDs of auth.users.
 class Guru {
-  final int id;
-  final String nip;
+  final String id;
   final String nama;
-  final String? email;
+  final String email;
+  final String role;
+  final dynamic kelasDiampu;
   final String? noHp;
-  final String status;
+  final String? avatarUrl;
   final String? fotoUrl;
-  final DateTime createdAt;
-  final DateTime? updatedAt;
+  final DateTime? createdAt;
 
   Guru({
     required this.id,
-    required this.nip,
     required this.nama,
-    this.email,
+    required this.email,
+    this.role = 'guru',
+    this.kelasDiampu,
     this.noHp,
-    required this.status,
+    this.avatarUrl,
     this.fotoUrl,
-    required this.createdAt,
-    this.updatedAt,
+    this.createdAt,
   });
 
-  /// Create Guru from JSON (typically from Supabase)
-  factory Guru.fromJson(Map<String, dynamic> json) {
-    return Guru(
-      id: json[GuruColumns.id] as int,
-      nip: json[GuruColumns.nip] as String? ?? '',
-      nama: json[GuruColumns.nama] as String? ?? '',
-      email: json[GuruColumns.email] as String?,
-      noHp: json[GuruColumns.noHp] as String?,
-      status: json[GuruColumns.status] as String? ?? 'aktif',
-      fotoUrl: json[GuruColumns.fotoUrl] as String?,
-      createdAt: json[GuruColumns.createdAt] != null
-          ? DateTime.parse(json[GuruColumns.createdAt] as String)
-          : DateTime.now(),
-      updatedAt: json[GuruColumns.updatedAt] != null
-          ? DateTime.parse(json[GuruColumns.updatedAt] as String)
-          : null,
-    );
-  }
+  factory Guru.fromJson(Map<String, dynamic> json) => Guru(
+    id: json[GuruColumns.id] as String,
+    nama: json[GuruColumns.nama] as String,
+    email: json[GuruColumns.email] as String,
+    role: json[GuruColumns.role] as String? ?? 'guru',
+    kelasDiampu: json[GuruColumns.kelasDiampu],
+    noHp: json[GuruColumns.noHp] as String?,
+    avatarUrl: json[GuruColumns.avatarUrl] as String?,
+    fotoUrl: json[GuruColumns.fotoUrl] as String?,
+    createdAt: DateTime.tryParse(json[GuruColumns.createdAt]?.toString() ?? ''),
+  );
 
-  /// Convert Guru to JSON for sending to Supabase
   Map<String, dynamic> toJson() => {
     GuruColumns.id: id,
-    GuruColumns.nip: nip,
     GuruColumns.nama: nama,
     GuruColumns.email: email,
+    GuruColumns.role: role,
+    GuruColumns.kelasDiampu: kelasDiampu,
     GuruColumns.noHp: noHp,
-    GuruColumns.status: status,
+    GuruColumns.avatarUrl: avatarUrl,
     GuruColumns.fotoUrl: fotoUrl,
-    GuruColumns.createdAt: createdAt.toIso8601String(),
-    GuruColumns.updatedAt: updatedAt?.toIso8601String(),
+    if (createdAt != null) GuruColumns.createdAt: createdAt!.toIso8601String(),
   };
 
-  /// Create a copy of this Guru with some fields replaced
   Guru copyWith({
-    int? id,
-    String? nip,
+    String? id,
     String? nama,
     String? email,
+    String? role,
+    dynamic kelasDiampu,
     String? noHp,
-    String? status,
+    String? avatarUrl,
     String? fotoUrl,
     DateTime? createdAt,
-    DateTime? updatedAt,
-  }) {
-    return Guru(
-      id: id ?? this.id,
-      nip: nip ?? this.nip,
-      nama: nama ?? this.nama,
-      email: email ?? this.email,
-      noHp: noHp ?? this.noHp,
-      status: status ?? this.status,
-      fotoUrl: fotoUrl ?? this.fotoUrl,
-      createdAt: createdAt ?? this.createdAt,
-      updatedAt: updatedAt ?? this.updatedAt,
-    );
-  }
+  }) => Guru(
+    id: id ?? this.id,
+    nama: nama ?? this.nama,
+    email: email ?? this.email,
+    role: role ?? this.role,
+    kelasDiampu: kelasDiampu ?? this.kelasDiampu,
+    noHp: noHp ?? this.noHp,
+    avatarUrl: avatarUrl ?? this.avatarUrl,
+    fotoUrl: fotoUrl ?? this.fotoUrl,
+    createdAt: createdAt ?? this.createdAt,
+  );
 
   @override
-  String toString() => 'Guru(id: $id, nip: $nip, nama: $nama)';
-
+  bool operator ==(Object other) => other is Guru && other.id == id;
   @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is Guru &&
-          runtimeType == other.runtimeType &&
-          id == other.id &&
-          nip == other.nip;
-
-  @override
-  int get hashCode => id.hashCode ^ nip.hashCode;
+  int get hashCode => id.hashCode;
 }

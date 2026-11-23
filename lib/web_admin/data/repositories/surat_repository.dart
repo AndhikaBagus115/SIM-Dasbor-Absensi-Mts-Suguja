@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'surat_deletion_repository.dart';
 import 'package:web_admin_mts/web_admin/core/constants.dart';
 import 'package:web_admin_mts/web_admin/core/exceptions.dart';
 import 'package:web_admin_mts/web_admin/data/models/surat_model.dart';
@@ -176,10 +177,9 @@ class SuratRepositoryImpl implements SuratRepository {
   @override
   Future<void> deleteSurat(int id) async {
     try {
-      await _supabase
-          .from(DbTables.surat)
-          .delete()
-          .eq(SuratColumns.id, id);
+      await SuratDeletionRepository(
+        _supabase,
+      ).enqueue([id], batchId: SuratDeletionRepository.newBatchId());
     } on PostgrestException catch (e) {
       throw RepositoryException(
         message: 'Failed to delete letter: ${e.message}',
@@ -201,7 +201,7 @@ class SuratRepositoryImpl implements SuratRepository {
       var query = _supabase.from(DbTables.surat).select('id');
 
       final response = await query.count(CountOption.exact);
-      
+
       return response.count;
     } catch (e) {
       return 0;
@@ -215,9 +215,11 @@ class SuratRepositoryImpl implements SuratRepository {
           .from(DbTables.surat)
           .stream(primaryKey: [SuratColumns.id])
           .order(SuratColumns.tanggal, ascending: false)
-          .map((response) => (response as List)
-              .map((json) => Surat.fromJson(json as Map<String, dynamic>))
-              .toList());
+          .map(
+            (response) => (response as List)
+                .map((json) => Surat.fromJson(json as Map<String, dynamic>))
+                .toList(),
+          );
     } catch (e) {
       return Stream.error(
         RepositoryException(
